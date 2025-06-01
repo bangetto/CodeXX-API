@@ -1,0 +1,1 @@
+export declare function runCode(input: any): Promise<any>;

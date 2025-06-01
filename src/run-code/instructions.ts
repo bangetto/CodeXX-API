@@ -1,9 +1,18 @@
-const {join} = require('path')
+import { join } from "path";
 
 const CODES_DIR = process.env.CODES_DIR || "/tmp/codes";
 const OUTPUTS_DIR = process.env.OUTPUTS_DIR || "/tmp/outputs";
 
-const commandMap = (jobID, language) => {
+export interface CommandMapResult {
+    compileCodeCommand?: string;
+    compilationArgs?: string[];
+    executeCodeCommand: string;
+    executionArgs?: string[];
+    outputExt?: string;
+    compilerInfoCommand: string;
+}
+
+export function commandMap(jobID: string, language: string): CommandMapResult {
     switch (language) {
         case 'java':
             return {
@@ -76,9 +85,9 @@ const commandMap = (jobID, language) => {
                 outputExt: 'exe',
                 compilerInfoCommand: 'mcs --version'
             }
+        default:
+            throw new Error(`Unsupported language: ${language}`);
     }
 }
 
-const supportedLanguages = ['java', 'cpp', 'py', 'c', 'js', 'go', 'cs'];
-
-module.exports = {commandMap, supportedLanguages}
+export const supportedLanguages = ['java', 'cpp', 'py', 'c', 'js', 'go', 'cs'];

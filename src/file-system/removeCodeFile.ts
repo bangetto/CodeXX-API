@@ -1,12 +1,12 @@
-const { unlinkSync } = require("fs");
-const { join } = require("path");
+import { unlinkSync } from "fs";
+import { join } from "path";
 
 const CODES_DIR = process.env.CODES_DIR || "/tmp/codes";
 const OUTPUTS_DIR = process.env.OUTPUTS_DIR || "/tmp/outputs";
 
-const removeCodeFile = async (uuid, lang, outputExt) => {
+export const removeCodeFile = (uuid: string, lang: string, outputExt?: string): void => {
     const codeFile = join(CODES_DIR, `${uuid}.${lang}`);
-    const outputFile = join(OUTPUTS_DIR, `${uuid}.${outputExt}`);
+    const outputFile = outputExt ? join(OUTPUTS_DIR, `${uuid}.${outputExt}`) : undefined;
 
     try {
         unlinkSync(codeFile);
@@ -14,15 +14,11 @@ const removeCodeFile = async (uuid, lang, outputExt) => {
         console.error(`Failed to delete code file: ${codeFile}`, err);
     }
 
-    if (outputExt) {
+    if (outputFile) {
         try {
             unlinkSync(outputFile);
         } catch (err) {
             console.error(`Failed to delete output file: ${outputFile}`, err);
         }
     }
-};
-
-module.exports = {
-    removeCodeFile,
 };
