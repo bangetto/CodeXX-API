@@ -4,7 +4,7 @@ const {supportedLanguages} = require("./run-code/instructions");
 const express = require("express");
 const bodyParser = require("body-parser");
 const app = express();
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 3000;
 const cors = require("cors");
 const {info} = require("./run-code/info");
 
@@ -22,7 +22,7 @@ const sendResponse = (res, statusCode, body) => {
     })
 }
 
-app.post("/", async (req, res) => {
+app.post("/api/codex", async (req, res) => {
     try {
         const output = await runCode(req.body)
         sendResponse(res, 200, output)
@@ -44,4 +44,6 @@ app.get('/list', async (req, res) => {
     sendResponse(res, 200, {supportedLanguages: body})
 })
 
-app.listen(port);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Backend running at http://localhost:${port}`);
+});
