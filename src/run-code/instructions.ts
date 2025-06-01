@@ -14,14 +14,14 @@ export interface CommandMapResult {
 
 export function commandMap(jobID: string, language: string): CommandMapResult {
     switch (language) {
-        case 'java':
+        /*case 'java':
             return {
                 executeCodeCommand: 'java',
                 executionArgs: [
                     `${CODES_DIR}/${jobID}.java`
                 ],
                 compilerInfoCommand: 'java --version'
-            };
+            };*/
         case 'cpp':
             return {
                 compileCodeCommand: 'g++',
@@ -34,7 +34,7 @@ export function commandMap(jobID: string, language: string): CommandMapResult {
                 outputExt: 'out',
                 compilerInfoCommand: 'g++ --version'
             };
-        case 'py':
+        /*case 'py':
             return {
                 executeCodeCommand: 'python3',
                 executionArgs: [
@@ -84,10 +84,11 @@ export function commandMap(jobID: string, language: string): CommandMapResult {
                 ],
                 outputExt: 'exe',
                 compilerInfoCommand: 'mcs --version'
-            }
+            }*/
         default:
             throw new Error(`Unsupported language: ${language}`);
     }
 }
 
-export const supportedLanguages = ['java', 'cpp', 'py', 'c', 'js', 'go', 'cs'];
+//export const supportedLanguages = ['java', 'cpp', 'py', 'c', 'js', 'go', 'cs'];
+export const supportedLanguages = ['cpp'];

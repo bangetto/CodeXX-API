@@ -22,7 +22,7 @@ const sendResponse = (res: Response, statusCode: number, body: any) => {
     });
 };
 
-app.post("/api/codex", async (req: Request, res: Response) => {
+app.post("/", async (req: Request, res: Response) => {
     try {
         const output = await runCode(req.body);
         sendResponse(res, 200, output);
