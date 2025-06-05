@@ -1,0 +1,18 @@
+{
+    "version": 0.1,
+    "useParallelCodeRunning": true,
+    "instructions": [
+        {
+            "language": "cpp",
+            "compileCodeCommand": "g++",
+            "compilationArgs": [
+                "${CODES_DIR}/${jobID}.cpp",
+                "-o",
+                "${OUTPUTS_DIR}/${jobID}.out"
+            ],
+            "executeCodeCommand": "${OUTPUTS_DIR}/${jobID}.out",
+            "outputExt": "out",
+            "compilerInfoCommand": "g++ --version"
+        }
+    ]
+}

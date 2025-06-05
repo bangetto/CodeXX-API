@@ -4,6 +4,7 @@ import cors from "cors";
 import { runCode } from "./run-code";
 import { supportedLanguages } from "./run-code/instructions";
 import { info } from "./run-code/info";
+import config from "./utils/config";
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -21,6 +22,9 @@ const sendResponse = (res: Response, statusCode: number, body: any) => {
         ...body
     });
 };
+
+
+  
 
 app.post("/", async (req: Request, res: Response) => {
     try {
@@ -44,5 +48,6 @@ app.get('/list', async (req: Request, res: Response) => {
 });
 
 app.listen(port, '0.0.0.0', () => {
+    if(config.version < 1) console.warn("Warning: This is an in development version of the backend. Please report any issues you find.");
     console.log(`Backend running at http://localhost:${port}`);
 });
