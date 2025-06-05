@@ -1,12 +1,12 @@
-# CodeX API
+# CodeXX API
 
-![CodeX](https://cronitor.io/badges/H2ppWF/production/F7bEkD7FFEXp0uypGbzlGEUtkzk.svg)
+> This API is still in very early stages of development. So consider not using the API in production since things ~~might~~ **will change** in the future, and the documentations might not be up-to-date.
 
-> This API is still in very early stages of development. So consider not using the API in production since things might change in the future.
-
-### Introducing the new CodeX API
+### Introducing the new CodeXX API
 
 Here's how you can execute code in various languages on your own website for free (no, there's no fucking catch, it's literally free),
+
+>This project is an unofficial contiunation of the [CodeX API by Jaagrav](https://github.com/Jaagrav/CodeX-API).
 
 ### Execute Code and fetch output
 
@@ -25,17 +25,24 @@ This endpoint allows you to execute your script and fetch output results.
 ### What are the languages that are supported for execution?
 
 Whichever language you might mention in the language field, it would be automatically executed with the latest version of it's compiler.
-| Languages | Language as a payload |
-|-----------|-----------------------|
-| Java | java |
-| Python | py |
-| C++ | cpp |
-| C | c |
-| GoLang | go |
-| C# | cs |
-| NodeJS | js |
+<details>
+<summary>Deprecated language support</summary>
 
-More coming very soon!
+  | Languages | Language as a payload |
+  |-----------|-----------------------|
+  | Java | java |
+  | Python | py |
+  | C++ | cpp |
+  | C | c |
+  | GoLang | go |
+  | C# | cs |
+  | NodeJS | js |
+
+  More coming very soon!
+
+</details><br>
+
+>Currently only C++ is supported, but dynamic language support is planned!
 
 ### NodeJS Example to Execute API Call?
 
@@ -123,6 +130,8 @@ This endpoint allows you to list all languages supported and their versions.
 }
 ```
 
-> This API is deployed on a free instance on [choreo](https://choreo.dev/) so shoutout to @wso2 for providing a platform that helped bringing back the CodeX API after a long down time. Since I am using a free tier, the API might be slow sometimes, so please be patient while I try to fund this project.
+> ~~This API is deployed on a free instance on [choreo](https://choreo.dev/) so shoutout to @wso2 for providing a platform that helped bringing back the CodeX API after a long down time. Since I am using a free tier, the API might be slow sometimes, so please be patient while I try to fund this project.~~
+
+> This API is not deployed publicly, it is necessery to self-host it
 
 Happy hacking!
