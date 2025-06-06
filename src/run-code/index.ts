@@ -4,20 +4,26 @@ import { removeCodeFile } from "../file-system/removeCodeFile";
 import { info } from "./info";
 import { spawn } from "child_process";
 
+interface TestingVal {
+    input: string;
+    output: string
+}
+
 interface RunCodeParams {
     language?: string;
     code?: string;
     input?: string;
+    tests?: TestingVal[];
 }
 
 interface RunCodeResult {
-    output: string;
+    output?: string;
     error: string;
     language: string;
     info: string;
 }
 
-export async function runCode({ language = "", code = "", input = "" }: RunCodeParams): Promise<RunCodeResult> {
+export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
     const timeout = 30;
 
     if (code === "")
