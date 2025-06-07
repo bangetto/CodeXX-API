@@ -125,7 +125,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         error = result.error;
     }
 
-    await removeCodeFile(jobID, language, outputExt);
+    removeCodeFile(jobID, language, outputExt);
 
     return {
         output,
