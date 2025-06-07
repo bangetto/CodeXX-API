@@ -1,4 +1,5 @@
 import { join } from "path";
+import config from "../utils/config";
 
 const CODES_DIR = process.env.CODES_DIR || "/tmp/codes";
 const OUTPUTS_DIR = process.env.OUTPUTS_DIR || "/tmp/outputs";
@@ -12,83 +13,33 @@ export interface CommandMapResult {
     compilerInfoCommand: string;
 }
 
-export function commandMap(jobID: string, language: string): CommandMapResult {
-    switch (language) {
-        /*case 'java':
-            return {
-                executeCodeCommand: 'java',
-                executionArgs: [
-                    `${CODES_DIR}/${jobID}.java`
-                ],
-                compilerInfoCommand: 'java --version'
-            };*/
-        case 'cpp':
-            return {
-                compileCodeCommand: 'g++',
-                compilationArgs: [
-                    `${CODES_DIR}/${jobID}.cpp`,
-                    '-o',
-                    `${OUTPUTS_DIR}/${jobID}.out`
-                ],
-                executeCodeCommand: `${OUTPUTS_DIR}/${jobID}.out`,
-                outputExt: 'out',
-                compilerInfoCommand: 'g++ --version'
-            };
-        /*case 'py':
-            return {
-                executeCodeCommand: 'python3',
-                executionArgs: [
-                    `${CODES_DIR}/${jobID}.py`
-                ],
-                compilerInfoCommand: 'python3 --version'
-            }
-        case 'c':
-            return {
-                compileCodeCommand: 'gcc',
-                compilationArgs: [
-                    `${CODES_DIR}/${jobID}.c`,
-                    '-o',
-                    `${OUTPUTS_DIR}/${jobID}.out`
-                ],
-                executeCodeCommand: `${OUTPUTS_DIR}/${jobID}.out`,
-                outputExt: 'out',
-                compilerInfoCommand: 'gcc --version'
-            }
-        case 'js':
-            return {
-                executeCodeCommand: 'node',
-                executionArgs: [
-                    `${CODES_DIR}/${jobID}.js`
-                ],
-                compilerInfoCommand: 'node --version'
-            }
-        case 'go':
-            return {
-                executeCodeCommand: 'go',
-                executionArgs: [
-                    'run',
-                    `${CODES_DIR}/${jobID}.go`
-                ],
-                compilerInfoCommand: 'go version'
-            }
-        case 'cs':
-            return {
-                compileCodeCommand: 'mcs',
-                compilationArgs: [
-                    `-out:${OUTPUTS_DIR}/${jobID}.exe`,
-                    `${CODES_DIR}/${jobID}.cs`,
-                ],
-                executeCodeCommand: 'mono',
-                executionArgs: [
-                    `${OUTPUTS_DIR}/${jobID}.exe`
-                ],
-                outputExt: 'exe',
-                compilerInfoCommand: 'mcs --version'
-            }*/
-        default:
-            throw new Error(`Unsupported language: ${language}`);
-    }
+type Instruction = typeof config.instructions[number] & {
+    executionArgs?: string[];
+};
+
+const instructionMap: Record<string, Instruction> = {};
+for (const instr of config.instructions) {
+    instructionMap[instr.language] = instr;
 }
 
-//export const supportedLanguages = ['java', 'cpp', 'py', 'c', 'js', 'go', 'cs'];
-export const supportedLanguages = ['cpp'];
+export function commandMap(jobID: string, language: string): CommandMapResult {
+    const instr = instructionMap[language];
+    if (!instr) throw new Error(`Unsupported language: ${language}`);
+
+    // Replace template variables in commands/args
+    const replaceVars = (val: string) =>
+        val.replace(/\$\{CODES_DIR\}/g, CODES_DIR)
+           .replace(/\$\{OUTPUTS_DIR\}/g, OUTPUTS_DIR)
+           .replace(/\$\{jobID\}/g, jobID);
+
+    return {
+        compileCodeCommand: instr.compileCodeCommand,
+        compilationArgs: instr.compilationArgs?.map(replaceVars),
+        executeCodeCommand: replaceVars(instr.executeCodeCommand),
+        executionArgs: instr.executionArgs?.map(replaceVars),
+        outputExt: instr.outputExt,
+        compilerInfoCommand: instr.compilerInfoCommand
+    };
+}
+
+export const supportedLanguages = config.instructions.map((i: { language: any; }) => i.language);
