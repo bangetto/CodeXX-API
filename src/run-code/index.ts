@@ -6,7 +6,7 @@ import { spawn } from "child_process";
 
 interface TestingVal {
     input: string;
-    output: string
+    output?: string
 }
 
 interface RunCodeParams {
@@ -18,7 +18,7 @@ interface RunCodeParams {
 
 interface RunCodeResult {
     output?: string;
-    testResults?: {output: string; passed: boolean}[];
+    testResults?: {output: string; passed?: boolean | undefined}[];
     error: string;
     language: string;
     info: string;
@@ -104,22 +104,23 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         });
     };
 
-    let testResults: { output: string; passed: boolean }[] | undefined = undefined;
+    let testResults: { output: string; passed?: boolean }[] | undefined = undefined;
     let output: string | undefined = undefined;
     let error: string = "";
 
     if (tests && tests.length > 0) {
-        // Run code for each test input
         testResults = [];
         for (const test of tests) {
             const result = await runWithInput(test.input);
-            if(result.error) {
+            if (result.error) {
                 error = result.error;
                 break; // Stop on first error
             } else {
                 testResults.push({
                     output: result.output,
-                    passed: result.output.trim() === test.output.trim()
+                    ...(typeof test.output !== "undefined"
+                        ? { passed: result.output.trim() === test.output.trim() }
+                        : {})
                 });
             }
         }
