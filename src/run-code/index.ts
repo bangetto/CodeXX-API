@@ -18,6 +18,7 @@ interface RunCodeParams {
 
 interface RunCodeResult {
     output?: string;
+    testResults?: {output: string; passed: boolean}[];
     error: string;
     language: string;
     info: string;
@@ -58,48 +59,79 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         });
     }
 
-    const result = await new Promise<{ output: string; error: string }>((resolve, reject) => {
-        const executeCode = spawn(executeCodeCommand, executionArgs || []);
-        let output = "", error = "";
+    // Helper to run the code with a single input string
+    const runWithInput = (inputStr: string): Promise<{ output: string; error: string }> => {
+        return new Promise((resolve, reject) => {
+            const executeCode = spawn(executeCodeCommand, executionArgs || []);
+            let output = "", error = "";
 
-        const timer = setTimeout(async () => {
-            executeCode.kill("SIGHUP");
-            await removeCodeFile(jobID, language, outputExt);
-            reject({
-                status: 408,
-                error: `CodeX API Timed Out. Your code took too long to execute, over ${timeout} seconds. Make sure you are sending input as payload if your code expects an input.`
-            })
-        }, timeout * 1000);
+            const timer = setTimeout(async () => {
+                executeCode.kill("SIGHUP");
+                await removeCodeFile(jobID, language, outputExt);
+                reject({
+                    status: 408,
+                    error: `CodeX API Timed Out. Your code took too long to execute, over ${timeout} seconds. Make sure you are sending input as payload if your code expects an input.`
+                })
+            }, timeout * 1000);
 
-        if (input !== "") {
-            input.split('\n').forEach((line) => {
-                executeCode.stdin.write(`${line}\n`);
+            if (inputStr) {
+                inputStr.split('\n').forEach((line) => {
+                    executeCode.stdin.write(`${line}\n`);
+                });
+                executeCode.stdin.end();
+            }
+
+            executeCode.stdin.on('error', (err) => {
+                console.log('stdin err', err);
             });
-            executeCode.stdin.end();
+
+            executeCode.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+
+            executeCode.stderr.on('data', (data) => {
+                error += data.toString();
+            });
+
+            executeCode.on('exit', () => {
+                clearTimeout(timer);
+                resolve({ output, error });
+            });
+        });
+    };
+
+    let testResults: { output: string; passed: boolean }[] | undefined = undefined;
+    let output: string | undefined = undefined;
+    let error: string = "";
+
+    if (tests && tests.length > 0) {
+        // Run code for each test input
+        testResults = [];
+        for (const test of tests) {
+            const result = await runWithInput(test.input);
+            if(result.error) {
+                error = result.error;
+                break; // Stop on first error
+            } else {
+                testResults.push({
+                    output: result.output,
+                    passed: result.output.trim() === test.output.trim()
+                });
+            }
         }
-
-        executeCode.stdin.on('error', (err) => {
-            console.log('stdin err', err);
-        });
-
-        executeCode.stdout.on('data', (data) => {
-            output += data.toString();
-        });
-
-        executeCode.stderr.on('data', (data) => {
-            error += data.toString();
-        });
-
-        executeCode.on('exit', () => {
-            clearTimeout(timer);
-            resolve({ output, error });
-        });
-    });
+    } else {
+        // Single input mode
+        const result = await runWithInput(input);
+        output = result.output;
+        error = result.error;
+    }
 
     await removeCodeFile(jobID, language, outputExt);
 
     return {
-        ...result,
+        output,
+        testResults,
+        error,
         language,
         info: await info(language)
     };
