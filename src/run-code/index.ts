@@ -67,7 +67,6 @@ export async function runCode({ language = "", code = "", input = "", tests = []
 
             const timer = setTimeout(async () => {
                 executeCode.kill("SIGHUP");
-                await removeCodeFile(jobID, language, outputExt);
                 reject({
                     status: 408,
                     error: `CodeX API Timed Out. Your code took too long to execute, over ${timeout} seconds. Make sure you are sending input as payload if your code expects an input.`
