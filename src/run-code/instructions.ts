@@ -18,7 +18,13 @@ type Instruction = typeof config.instructions[number] & {
 };
 
 const instructionMap: Record<string, Instruction> = {};
+if (!config.instructions || !Array.isArray(config.instructions)) {
+    throw new Error("Invalid config: instructions must be an array");
+}
 for (const instr of config.instructions) {
+    if (!instr.language) {
+        throw new Error("Invalid instruction: missing language property");
+    }
     instructionMap[instr.language] = instr;
 }
 
