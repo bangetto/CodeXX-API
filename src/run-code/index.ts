@@ -24,6 +24,8 @@ interface RunCodeResult {
     info: string;
 }
 
+const ID = 1000; // this id is used to run the code as a non-root user
+
 export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
     const timeout = 30;
 
@@ -62,7 +64,10 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     // Helper to run the code with a single input string
     const runWithInput = (inputStr: string): Promise<{ output: string; error: string }> => {
         return new Promise((resolve, reject) => {
-            const executeCode = spawn(executeCodeCommand, executionArgs || []);
+            const executeCode = spawn(executeCodeCommand, executionArgs || [],{
+                uid: ID,
+                gid: ID
+            });
             let output = "", error = "";
 
             const timer = setTimeout(async () => {
