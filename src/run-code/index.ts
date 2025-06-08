@@ -18,7 +18,7 @@ interface RunCodeParams {
 
 interface RunCodeResult {
     output?: string;
-    testResults?: {output: string; passed?: boolean | undefined}[];
+    testResults?: {output: string; passed: boolean}[];
     error: string;
     language: string;
     info: string;
@@ -64,10 +64,12 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     // Helper to run the code with a single input string
     const runWithInput = (inputStr: string): Promise<{ output: string; error: string }> => {
         return new Promise((resolve, reject) => {
-            const executeCode = spawn(executeCodeCommand, executionArgs || [],{
-                uid: ID,
-                gid: ID
-            });
+            const spawnOptions: any = { };
+            if (process.platform !== "win32") {
+                spawnOptions.uid = ID;
+                spawnOptions.gid = ID;
+            }
+            const executeCode = spawn(executeCodeCommand, executionArgs || [], spawnOptions);
             let output = "", error = "";
 
             const timer = setTimeout(async () => {
@@ -104,24 +106,28 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         });
     };
 
-    let testResults: { output: string; passed?: boolean }[] | undefined = undefined;
+    let testResults: { output: string; passed: boolean }[] | undefined = undefined;
     let output: string | undefined = undefined;
     let error: string = "";
 
     if (tests && tests.length > 0) {
+        console.log("Received tests:", JSON.stringify(tests, null, 2));
         testResults = [];
-        for (const test of tests) {
+        for (let i = 0; i < tests.length; i++) {
+            const test = tests[i];
+            console.log("Test item:", test);
             const result = await runWithInput(test.input);
             if (result.error) {
                 error = result.error;
                 break; // Stop on first error
             } else {
-                testResults.push({
-                    output: result.output,
-                    ...(typeof test.output !== "undefined"
-                        ? { passed: result.output.trim() === test.output.trim() }
-                        : {})
-                });
+                testResults[i] = { output: "", passed: false }; // Create the object first
+                testResults[i].output = result.output;
+                if(test.output) {
+                    testResults[i].passed = result.output.trim() === test.output.trim();
+                } else {
+                    testResults[i].passed = true; // If no expected output is provided, consider it passed
+                }
             }
         }
     } else {
