@@ -76,7 +76,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
                 executeCode.kill("SIGHUP");
                 reject({
                     status: 408,
-                    error: `CodeX API Timed Out. Your code took too long to execute, over ${timeout} seconds. Make sure you are sending input as payload if your code expects an input.`
+                    error: `CodeXX API Timed Out. Your code took too long to execute, over ${timeout} seconds. Make sure you are sending input as payload if your code expects an input.`
                 })
             }, timeout * 1000);
 
@@ -111,11 +111,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     let error: string = "";
 
     if (tests && tests.length > 0) {
-        console.log("Received tests:", JSON.stringify(tests, null, 2));
         testResults = [];
         for (let i = 0; i < tests.length; i++) {
             const test = tests[i];
-            console.log("Test item:", test);
             const result = await runWithInput(test.input);
             if (result.error) {
                 error = result.error;

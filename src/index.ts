@@ -27,6 +27,9 @@ const sendResponse = (res: Response, statusCode: number, body: any) => {
   
 
 app.post("/", async (req: Request, res: Response) => {
+    console.log(`Received request: ${req.method} ${req.url}`);
+    console.log(`Request body: ${JSON.stringify(req.body, null, 2)}`);
+    console.log('')
     try {
         const output = await runCode(req.body);
         sendResponse(res, 200, output);
@@ -36,6 +39,8 @@ app.post("/", async (req: Request, res: Response) => {
 });
 
 app.get('/list', async (req: Request, res: Response) => {
+    console.log(`Received request: ${req.method} ${req.url}`);
+    console.log('')
     // Fetch info for all languages in parallel
     const body = await Promise.all(
         supportedLanguages.map(async (language: any) => ({
@@ -49,5 +54,5 @@ app.get('/list', async (req: Request, res: Response) => {
 
 app.listen(port, '0.0.0.0', () => {
     if(config.version < 1) console.warn("Warning: This is an in development version of the backend. Please report any issues you find.");
-    console.log(`Backend running at http://localhost:${port}`);
+    console.log(`Backend running at http://localhost:${port}\n\n`);
 });
