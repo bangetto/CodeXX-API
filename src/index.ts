@@ -39,8 +39,6 @@ app.post("/", async (req: Request, res: Response) => {
 });
 
 app.get('/list', async (req: Request, res: Response) => {
-    console.log(`Received request: ${req.method} ${req.url}`);
-    console.log('')
     // Fetch info for all languages in parallel
     const body = await Promise.all(
         supportedLanguages.map(async (language: any) => ({
@@ -50,6 +48,10 @@ app.get('/list', async (req: Request, res: Response) => {
     );
 
     sendResponse(res, 200, { supportedLanguages: body });
+});
+
+app.get('/version', (req: Request, res: Response) => {
+    sendResponse(res, 200, {api: 'CodeXX' ,version: config.version});
 });
 
 app.listen(port, '0.0.0.0', () => {
