@@ -55,6 +55,6 @@ app.get('/version', (req: Request, res: Response) => {
 });
 
 app.listen(port, '0.0.0.0', () => {
-    if(config.version < 1) console.warn("Warning: This is an in development version of the backend. Please report any issues you find.");
-    console.log(`Backend running at http://localhost:${port}\n\n`);
+    if(config.version < 1) console.warn("Warning: This is an in development version of the API. Please report any issues you find.");
+    console.log(`API running at http://localhost:${port}\n\n`);
 });

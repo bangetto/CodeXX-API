@@ -38,7 +38,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     if (!supportedLanguages.includes(language))
         throw {
             status: 400,
-            error: `Please enter a valid language. Check documentation for more details: https://github.com/Jaagrav/CodeX-API#readme. The languages currently supported are: ${supportedLanguages.join(', ')}.`
+            error: `Entered language is not supported, for more information visit the wiki: https://github.com/bangetto/CodeXX-API/wiki. The languages currently supported are: ${supportedLanguages.join(', ')}.`
         }
 
     const { jobID } = createCodeFile(language, code);
