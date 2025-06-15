@@ -119,12 +119,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
                 error = result.error;
                 break; // Stop on first error
             } else {
-                testResults[i] = { output: "", passed: false }; // Create the object first
-                testResults[i].output = result.output;
+                testResults[i] = { output: result.output, passed: true };
                 if(test.output) {
                     testResults[i].passed = result.output.trim() === test.output.trim();
-                } else {
-                    testResults[i].passed = true; // If no expected output is provided, consider it passed
                 }
             }
         }
