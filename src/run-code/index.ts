@@ -81,11 +81,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             }, timeout * 1000);
 
             if (inputStr) {
-                inputStr.split('\n').forEach((line) => {
-                    executeCode.stdin.write(`${line}\n`);
-                });
-                executeCode.stdin.end();
+                executeCode.stdin.write(inputStr);
             }
+            executeCode.stdin.end();
 
             executeCode.stdin.on('error', (err) => {
                 console.log('stdin err', err);
