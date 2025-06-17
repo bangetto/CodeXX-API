@@ -26,6 +26,15 @@ interface RunCodeResult {
 
 const ID = 1000; // this id is used to run the code as a non-root user
 
+function normalizeOutput(str: string): string {
+    return str
+        .replace(/\r\n|\r/g, '\n') // Normalize line endings
+        .split('\n')
+        .map(line => line.trimEnd()) // Remove trailing spaces on each line
+        .join('\n')
+        .trim(); // Remove leading/trailing newlines
+}
+
 export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
     const timeout = 30;
 
@@ -117,9 +126,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
                 error = result.error;
                 break; // Stop on first error
             } else {
-                testResults[i] = { output: result.output, passed: true };
+                testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
                 if(test.output) {
-                    testResults[i].passed = result.output.trim() === test.output.trim();
+                    testResults[i].passed = normalizeOutput(result.output) === normalizeOutput(test.output);
                 }
             }
         }
