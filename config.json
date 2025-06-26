@@ -1,6 +1,5 @@
 {
     "version": 0.1,
-    "useParallelCodeRunning": true,
     "instructions": [
         {
             "language": "cpp",
