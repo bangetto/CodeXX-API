@@ -47,11 +47,11 @@ app.get('/list', async (req: Request, res: Response) => {
         }))
     );
 
-    sendResponse(res, 200, { supportedLanguages: body });
+    sendResponse(res, 200, { supportedLanguages: body, version: config.version });
 });
 
-app.get('/version', (req: Request, res: Response) => {
-    sendResponse(res, 200, {api: 'CodeXX' ,version: config.version});
+app.get('/status', (req: Request, res: Response) => {
+    sendResponse(res, 200, null);
 });
 
 app.listen(port, '0.0.0.0', () => {
