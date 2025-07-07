@@ -126,9 +126,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
                 error = result.error;
                 break; // Stop on first error
             } else {
-                testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
+                testResults[i] = { output: normalizeOutput(result.output), passed: true };
                 if(test.output) {
-                    testResults[i].passed = normalizeOutput(result.output) === normalizeOutput(test.output);
+                    testResults[i].passed = testResults[i].output === normalizeOutput(test.output);
                 }
             }
         }
