@@ -50,7 +50,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             error: `Entered language is not supported, for more information visit the wiki: https://github.com/bangetto/CodeXX-API/wiki. The languages currently supported are: ${supportedLanguages.join(', ')}.`
         }
 
-    const { jobID } = createCodeFile(language, code);
+    const { jobID } = await createCodeFile(language, code);
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs, outputExt } = commandMap(jobID, language);
 
     if (compileCodeCommand) {

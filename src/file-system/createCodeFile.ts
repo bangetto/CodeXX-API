@@ -1,5 +1,5 @@
 import { v4 as getUUID } from "uuid";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { promises as fsPromises, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
 const CODES_DIR = process.env.CODES_DIR || "/tmp/codes";
@@ -14,12 +14,12 @@ export interface CreateCodeFileResult {
     jobID: string;
 }
 
-export const createCodeFile = (language: string, code: string): CreateCodeFileResult => {
+export async function createCodeFile(language: string, code: string): Promise<CreateCodeFileResult> {
     const jobID = getUUID();
     const fileName = `${jobID}.${language}`;
     const filePath = join(CODES_DIR, fileName);
 
-    writeFileSync(filePath, code.toString());
+    await fsPromises.writeFile(filePath, code.toString());
 
     return {
         fileName,

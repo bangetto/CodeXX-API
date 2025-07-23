@@ -1,4 +1,3 @@
-import { join } from "path";
 import config from "../utils/config";
 
 const CODES_DIR = process.env.CODES_DIR || "/tmp/codes";
