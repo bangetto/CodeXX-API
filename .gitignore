@@ -2,5 +2,5 @@ node_modules/
 codes/
 classes/
 dist/
-start.bat
+*.bat
 *.zip

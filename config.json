@@ -7,7 +7,8 @@
             "compilationArgs": [
                 "${CODES_DIR}/${jobID}.cpp",
                 "-o",
-                "${OUTPUTS_DIR}/${jobID}.out"
+                "${OUTPUTS_DIR}/${jobID}.out",
+                "-O2"
             ],
             "executeCodeCommand": "${OUTPUTS_DIR}/${jobID}.out",
             "outputExt": "out",
