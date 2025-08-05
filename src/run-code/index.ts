@@ -52,7 +52,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     const { jobID, filePath } = await createCodeFile(language, code);
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
     
-    const containerName = `runner-${jobID}`;
+    const containerName = `codexx-runner-${language}-${jobID}`;
     const containerArgs = [
         'run',
         '-d', // Run in detached mode

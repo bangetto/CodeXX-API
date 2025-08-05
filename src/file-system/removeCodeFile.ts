@@ -9,6 +9,6 @@ export async function removeCodeFile(uuid: string): Promise<void> {
     try {
         await fsPromises.unlink(codeDir);
     } catch (err) {
-        console.error(`Failed to delete code file: ${codeDir}`, err);
+        console.error(`Failed to delete code folder: ${codeDir}`, err);
     }
 };

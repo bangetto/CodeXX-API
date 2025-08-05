@@ -2,6 +2,7 @@ node_modules/
 codes/
 classes/
 dist/
+tmp/
 *.bat
 *.zip
 *.md
