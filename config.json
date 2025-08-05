@@ -1,18 +1,19 @@
 {
-    "version": 0.1,
+    "version": 0.2,
     "instructions": [
         {
             "language": "cpp",
             "compileCodeCommand": "g++",
             "compilationArgs": [
-                "${CODES_DIR}/${jobID}.cpp",
+                "main.cpp",
                 "-o",
-                "${OUTPUTS_DIR}/${jobID}.out",
+                "main.exe",
                 "-O2"
             ],
-            "executeCodeCommand": "${OUTPUTS_DIR}/${jobID}.out",
-            "outputExt": "out",
+            "executeCodeCommand": "./main.exe",
+            "outputExt": "exe",
             "compilerInfoCommand": "g++ --version"
         }
-    ]
+    ],
+    "containerProvider": "podman"
 }

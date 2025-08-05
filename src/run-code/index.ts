@@ -3,6 +3,7 @@ import { createCodeFile } from "../file-system/createCodeFile";
 import { removeCodeFile } from "../file-system/removeCodeFile";
 import { info } from "./info";
 import { spawn } from "child_process";
+import config from "../utils/config";
 
 interface TestingVal {
     input: string;
@@ -23,8 +24,6 @@ interface RunCodeResult {
     language: string;
     info: string;
 }
-
-const ID = 1000; // this id is used to run the code as a non-root user
 
 function normalizeOutput(str: string): string {
     return str
@@ -50,102 +49,107 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             error: `Entered language is not supported, for more information visit the wiki: https://github.com/bangetto/CodeXX-API/wiki. The languages currently supported are: ${supportedLanguages.join(', ')}.`
         }
 
-    const { jobID } = await createCodeFile(language, code);
-    const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs, outputExt } = commandMap(jobID, language);
+    const { jobID, filePath } = await createCodeFile(language, code);
+    const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
+    
+    const containerName = `runner-${jobID}`;
+    const containerArgs = [
+        'run',
+        '-d', // Run in detached mode
+        '--name', containerName,
+        '-v', `${filePath}:/code`,
+        '-w', '/code',
+        '--user', `${1000}:${1000}`,
+        '--network=none',
+        `${language}-compile-run`,
+        'sleep', 'infinity' // Keep container alive
+    ];
 
-    if (compileCodeCommand) {
-        await new Promise<void>((resolve, reject) => {
-            const compileCode = spawn(compileCodeCommand, compilationArgs || []);
-            compileCode.stderr.on('data', (error) => {
-                reject({
-                    status: 200,
-                    output: '',
-                    error: error.toString(),
-                    language
-                })
-            });
-            compileCode.on('exit', () => {
-                resolve();
-            });
+    const startProcess = spawn(config.containerProvider, containerArgs);
+    await new Promise<void>((resolve, reject) => {
+        startProcess.on('exit', (code) => {
+            if (code === 0) return resolve();
+            let error = '';
+            startProcess.stderr.on('data', (data) => error += data.toString());
+            startProcess.stderr.on('end', () => reject(new Error(`Failed to start container: ${error}`)));
         });
-    }
+    });
 
-    // Helper to run the code with a single input string
-    const runWithInput = (inputStr: string): Promise<{ output: string; error: string }> => {
-        return new Promise((resolve, reject) => {
-            const spawnOptions: any = { };
-            if (process.platform !== "win32") {
-                spawnOptions.uid = ID;
-                spawnOptions.gid = ID;
-            }
-            const executeCode = spawn(executeCodeCommand, executionArgs || [], spawnOptions);
-            let output = "", error = "";
-
-            const timer = setTimeout(async () => {
-                executeCode.kill("SIGHUP");
-                reject({
-                    status: 408,
-                    error: `CodeXX API Timed Out. Your code took too long to execute, over ${timeout} seconds. Make sure you are sending input as payload if your code expects an input.`
-                })
-            }, timeout * 1000);
-
-            if (inputStr) {
-                executeCode.stdin.write(inputStr);
-            }
-            executeCode.stdin.end();
-
-            executeCode.stdin.on('error', (err) => {
-                console.log('stdin err', err);
+    try {
+        if (compileCodeCommand) {
+            const compileArgs = ['exec', containerName, compileCodeCommand, ...(compilationArgs || [])];
+            await new Promise<void>((resolve, reject) => {
+                const compileProcess = spawn(config.containerProvider, compileArgs);
+                let error = '';
+                compileProcess.stderr.on('data', (data) => error += data.toString());
+                compileProcess.on('exit', (code) => {
+                    if (code === 0) return resolve();
+                    reject({ status: 200, output: '', error, language });
+                });
             });
+        }
 
-            executeCode.stdout.on('data', (data) => {
-                output += data.toString();
+        const runWithInput = (inputStr: string): Promise<{ output: string; error: string }> => {
+            return new Promise((resolve, reject) => {
+                const execArgs = ['exec', '-i', containerName, executeCodeCommand, ...(executionArgs || [])];
+                const executeProcess = spawn(config.containerProvider, execArgs);
+
+                let output = '';
+                let error = '';
+                const timer = setTimeout(() => {
+                    executeProcess.kill('SIGKILL');
+                    reject({
+                        status: 408,
+                        error: `CodeXX API Timed Out. Your code took too long to execute, over ${timeout} seconds.`
+                    });
+                }, timeout * 1000);
+
+                executeProcess.stdout.on('data', (data) => output += data.toString());
+                executeProcess.stderr.on('data', (data) => error += data.toString());
+
+                executeProcess.on('exit', () => {
+                    clearTimeout(timer);
+                    resolve({ output, error });
+                });
+
+                if (inputStr) {
+                    executeProcess.stdin.write(inputStr + '\n');
+                }
+                executeProcess.stdin.end();
             });
+        };
 
-            executeCode.stderr.on('data', (data) => {
-                error += data.toString();
-            });
+        let testResults: { output: string; passed: boolean }[] | undefined = undefined;
+        let output: string | undefined = undefined;
+        let error: string = "";
 
-            executeCode.on('exit', () => {
-                clearTimeout(timer);
-                resolve({ output, error });
-            });
-        });
-    };
-
-    let testResults: { output: string; passed: boolean }[] | undefined = undefined;
-    let output: string | undefined = undefined;
-    let error: string = "";
-
-    if (tests && tests.length > 0) {
-        testResults = [];
-        for (let i = 0; i < tests.length; i++) {
-            const test = tests[i];
-            const result = await runWithInput(test.input);
-            if (result.error) {
-                error = result.error;
-                break; // Stop on first error
-            } else {
-                testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
-                if(test.output) {
-                    testResults[i].passed = normalizeOutput(result.output) === normalizeOutput(test.output);
+        if (tests && tests.length > 0) {
+            testResults = [];
+            for (let i = 0; i < tests.length; i++) {
+                const test = tests[i];
+                const result = await runWithInput(test.input);
+                if (result.error) {
+                    error = result.error;
+                    break;
+                } else {
+                    testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
+                    if (test.output) {
+                        testResults[i].passed = normalizeOutput(result.output) === normalizeOutput(test.output);
+                    }
                 }
             }
+        } else {
+            const result = await runWithInput(input);
+            output = result.output;
+            error = result.error;
         }
-    } else {
-        // Single input mode
-        const result = await runWithInput(input);
-        output = result.output;
-        error = result.error;
+
+        return { output, testResults, error, language, info: await info(language) };
+
+    } finally {
+        spawn(config.containerProvider, ['stop', containerName]);
+        spawn(config.containerProvider, ['rm', containerName]);
+        removeCodeFile(jobID);
+        console.log(`Cleaned up jobID: ${jobID}`);
     }
-
-    removeCodeFile(jobID, language, outputExt);
-
-    return {
-        output,
-        testResults,
-        error,
-        language,
-        info: await info(language)
-    };
 }
