@@ -2,7 +2,7 @@ import { v4 as getUUID } from "uuid";
 import { promises as fsPromises } from "fs";
 import { join } from "path";
 
-const usrDir = process.env.USR_DIR || "/tmp";
+const usrDir = process.env.USR_DIR || "./tmp";
 
 export interface CreateCodeFileResult {
     fileName: string;

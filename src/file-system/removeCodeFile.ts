@@ -1,7 +1,7 @@
 import { promises as fsPromises } from "fs";
 import { join } from "path";
 
-const usrDir = process.env.USR_DIR || "/tmp";
+const usrDir = process.env.USR_DIR || "./tmp";
 
 export async function removeCodeFile(uuid: string): Promise<void> {
     const codeDir = join(usrDir, uuid);
