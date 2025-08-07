@@ -2,12 +2,12 @@ import { commandMap, supportedLanguages } from "./instructions";
 import { createCodeFile } from "../file-system/createCodeFile";
 import { removeCodeFile } from "../file-system/removeCodeFile";
 import { info } from "./info";
-import { spawn } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import config from "../utils/config";
 
 interface TestingVal {
     input: string;
-    output?: string
+    output?: string;
 }
 
 interface RunCodeParams {
@@ -19,7 +19,7 @@ interface RunCodeParams {
 
 interface RunCodeResult {
     output?: string;
-    testResults?: {output: string; passed: boolean}[];
+    testResults?: { output: string; passed: boolean }[];
     error: string;
     language: string;
     info: string;
@@ -32,6 +32,27 @@ function normalizeOutput(str: string): string {
         .map(line => line.trimEnd()) // Remove trailing spaces on each line
         .join('\n')
         .trim(); // Remove leading/trailing newlines
+}
+
+function executeCleanupCommand(command: string, args: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const process = spawn(command, args);
+        let errorOutput = '';
+        process.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+        });
+        process.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Command failed with code ${code}: ${command} ${args.join(' ')}
+${errorOutput}`));
+            }
+        });
+        process.on('error', (err) => {
+            reject(err);
+        });
+    });
 }
 
 export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
@@ -147,9 +168,15 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         return { output, testResults, error, language, info: await info(language) };
 
     } finally {
-        spawn(config.containerProvider, ['stop', containerName]);
-        spawn(config.containerProvider, ['rm', containerName]);
-        removeCodeFile(jobID);
-        console.log(`Cleaned up jobID: ${jobID}`);
+        try {
+            await executeCleanupCommand(config.containerProvider, ['stop', containerName]);
+            await executeCleanupCommand(config.containerProvider, ['rm', containerName]);
+        } catch (error) {
+            console.error(`Error during cleanup for jobID: ${jobID}`, error);
+        } finally {
+            startProcess?.kill('SIGKILL');
+            removeCodeFile(jobID);
+            console.log(`Cleaned up jobID: ${jobID}`);
+        }
     }
 }
