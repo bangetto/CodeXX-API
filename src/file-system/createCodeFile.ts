@@ -14,9 +14,8 @@ export async function createCodeFile(language: string, code: string): Promise<Cr
     const jobID = getUUID();
     const fileName = `main.${language}`;
     const filePath = join(usrDir, jobID);
-    await fsPromises.mkdir(filePath, { recursive: true });
-
-    await fsPromises.writeFile(join(filePath, fileName), code.toString());
+    await fsPromises.mkdir(filePath, { recursive: true, mode: 0o700 });
+    await fsPromises.writeFile(join(filePath, fileName), code.toString(), { encoding: "utf8", mode: 0o600 });
 
     return {
         fileName,

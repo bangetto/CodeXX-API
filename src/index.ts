@@ -25,7 +25,7 @@ const sendResponse = (res: Response, statusCode: number, body: any) => {
 
 
 app.post("/", async (req: Request, res: Response) => {
-    console.log(`Received request with body: ${JSON.stringify(req.body)}`);
+    console.log(`Received request with language: ${req.body.language}, code length: ${req.body.code.length}`);
     try {
         const output = await runCode(req.body);
         sendResponse(res, 200, output);

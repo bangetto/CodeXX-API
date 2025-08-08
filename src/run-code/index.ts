@@ -104,9 +104,10 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
         executeProcess.stdout.on('data', (data) => output += data.toString());
         executeProcess.stderr.on('data', (data) => error += data.toString());
 
-        executeProcess.on('exit', () => {
+        executeProcess.on('exit', (code) => {
             clearTimeout(timer);
-            resolve({ output, error });
+            const execError = code === 0? '': (error || `Process exited with code ${code}`);
+            resolve({ output, error: execError });
         });
 
         if (inputStr) {
