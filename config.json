@@ -1,8 +1,8 @@
 {
     "version": 0.2,
-    "instructions": [
-        {
-            "language": "cpp",
+    "instructions": {
+        "cpp": {
+            "preWarmCount": 3,
             "compileCodeCommand": "g++",
             "compilationArgs": [
                 "main.cpp",
@@ -14,6 +14,6 @@
             "outputExt": "exe",
             "compilerInfoCommand": "g++ --version"
         }
-    ],
+    },
     "containerProvider": "podman"
 }

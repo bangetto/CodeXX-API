@@ -7,7 +7,7 @@ export async function removeCodeFile(uuid: string): Promise<void> {
     const codeDir = join(usrDir, uuid);
 
     try {
-        await fsPromises.unlink(codeDir);
+        await fsPromises.rm(codeDir, { recursive: true, force: true });
     } catch (err) {
         console.error(`Failed to delete code folder: ${codeDir}`, err);
     }

@@ -12,30 +12,13 @@ export interface CommandMapResult {
     compilerInfoCommand: string;
 }
 
-type Instruction = typeof config.instructions[number] & {
-    executionArgs?: string[];
-};
-
-const instructionMap: Record<string, Instruction> = {};
-if (!config.instructions || !Array.isArray(config.instructions)) {
-    throw new Error("Invalid config: instructions must be an array");
-}
-for (const instr of config.instructions) {
-    if (!instr.language) {
-        throw new Error("Invalid instruction: missing language property");
-    }
-    instructionMap[instr.language] = instr;
-}
-
 export function commandMap(jobID: string, language: string): CommandMapResult {
-    const instr = instructionMap[language];
+    const instr = config.instructions[language];
     if (!instr) throw new Error(`Unsupported language: ${language}`);
 
     // Replace template variables in commands/args
     const replaceVars = (val: string) =>
-        val.replace(/\$\{CODES_DIR\}/g, CODES_DIR)
-           .replace(/\$\{OUTPUTS_DIR\}/g, OUTPUTS_DIR)
-           .replace(/\$\{jobID\}/g, jobID);
+        val.replace(/\${jobID}/g, jobID);
 
     return {
         compileCodeCommand: instr.compileCodeCommand,
@@ -47,4 +30,4 @@ export function commandMap(jobID: string, language: string): CommandMapResult {
     };
 }
 
-export const supportedLanguages = config.instructions.map((i: { language: any; }) => i.language);
+export const supportedLanguages = Object.keys(config.instructions);
