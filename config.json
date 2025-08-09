@@ -11,7 +11,6 @@
                 "-O2"
             ],
             "executeCodeCommand": "./main.exe",
-            "outputExt": "exe",
             "compilerInfoCommand": "g++ --version"
         }
     },

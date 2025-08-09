@@ -6,7 +6,6 @@ export interface Instruction {
     compilationArgs?: string[];
     executeCodeCommand: string;
     executionArgs?: string[];
-    outputExt?: string;
     compilerInfoCommand: string;
 }
 

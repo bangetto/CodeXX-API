@@ -1,14 +1,10 @@
 import config from "../utils/config";
 
-const CODES_DIR = process.env.CODES_DIR || "/tmp/codes";
-const OUTPUTS_DIR = process.env.OUTPUTS_DIR || "/tmp/outputs";
-
 export interface CommandMapResult {
     compileCodeCommand?: string;
     compilationArgs?: string[];
     executeCodeCommand: string;
     executionArgs?: string[];
-    outputExt?: string;
     compilerInfoCommand: string;
 }
 
@@ -25,7 +21,6 @@ export function commandMap(jobID: string, language: string): CommandMapResult {
         compilationArgs: instr.compilationArgs?.map(replaceVars),
         executeCodeCommand: replaceVars(instr.executeCodeCommand),
         executionArgs: instr.executionArgs?.map(replaceVars),
-        outputExt: instr.outputExt,
         compilerInfoCommand: instr.compilerInfoCommand
     };
 }
