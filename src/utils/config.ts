@@ -15,6 +15,7 @@ export interface Config {
         [language: string]: Instruction;
     };
     containerProvider: string;
+    containerProviderStartupCommand?: string;
 }
 
 const config: Config = configData;

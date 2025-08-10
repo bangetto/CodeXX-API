@@ -54,10 +54,10 @@ function executeCleanupCommand(command: string, args: string[]): Promise<void> {
     });
 }
 
-async function startContainer(containerName: string, filePath: string, language: string): Promise<ChildProcess> {
+async function startContainer(containerName: string, dirPath: string, language: string): Promise<ChildProcess> {
     const containerArgs = [
         'run', '-d', '--name', containerName,
-        '-v', `${filePath}:/code`, '-w', '/code',
+        '-v', `${dirPath}:/code`, '-w', '/code',
         '--user', `${1000}:${1000}`,
         '--network=none', `${language}-compile-run`,
         'sleep', 'infinity'

@@ -14,5 +14,6 @@
             "compilerInfoCommand": "g++ --version"
         }
     },
-    "containerProvider": "podman"
+    "containerProvider": "podman",
+    "containerProviderStartupCommand": "podman machine start"
 }
