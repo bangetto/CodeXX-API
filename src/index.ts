@@ -7,7 +7,6 @@ import { info } from "./run-code/info";
 import config from "./utils/config";
 import { initializeContainerPool, cleanupContainerPool } from "./run-code/containerPoolManager";
 import { ensureContainerProviderReady } from "./utils/containerProviderManager";
-import { uptime } from "process";
 
 async function startUp() {
     try {
@@ -92,14 +91,14 @@ async function startUp() {
             });
             process.exit(0);
         });
-        // set a timeout to force exit if not closed in 10s
+        // set a timeout to force exit if not closed in 30s
         setTimeout(() => {
             console.error('Could not close connections in time, forcefully shutting down');
             cleanupContainerPool().catch(err => {
                 console.error('Error during forced container pool cleanup:', err);
             });
             process.exit(1);
-        }, 10000);
+        }, 30000);
     }
 
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
