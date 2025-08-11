@@ -5,8 +5,7 @@ import { runCode } from "./run-code";
 import { supportedLanguages } from "./run-code/instructions";
 import { info } from "./run-code/info";
 import config from "./utils/config";
-import { initializeContainerPool } from "./run-code/containerPoolManager";
-
+import { initializeContainerPool, cleanupContainerPool } from "./run-code/containerPoolManager";
 import { ensureContainerProviderReady } from "./utils/containerProviderManager";
 
 async function startUp() {
@@ -78,12 +77,22 @@ async function startUp() {
     function gracefulShutdown(signal: string) {
         console.log(`\nReceived ${signal}, shutting down gracefully...`);
         server.close(() => {
-            console.log('HTTP server closed. Exiting process.');
+            console.log('HTTP server closed.');
+            cleanupContainerPool().then(() => {
+                console.log('Container pool cleaned up.');
+                process.exit(0);
+            }).catch(err => {
+                console.error('Error during container pool cleanup:', err);
+                process.exit(1);
+            });
             process.exit(0);
         });
-        // Optional: set a timeout to force exit if not closed in 10s
+        // set a timeout to force exit if not closed in 10s
         setTimeout(() => {
             console.error('Could not close connections in time, forcefully shutting down');
+            cleanupContainerPool().catch(err => {
+                console.error('Error during forced container pool cleanup:', err);
+            });
             process.exit(1);
         }, 10000);
     }

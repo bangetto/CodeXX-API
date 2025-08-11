@@ -62,3 +62,27 @@ export function returnContainer(language: string, containerName: string): void {
     containerPool[language].push(containerName);
     console.log(`Returned container: ${containerName} to pool for language: ${language}`);
 }
+
+export async function cleanupContainerPool(): Promise<void> {
+    console.log("Cleaning up container pool...");
+    for (const language in containerPool) {
+        for (const containerName of containerPool[language]) {
+            try {
+                const cleanupArgs = ['rm', '-f', containerName];
+                const cleanupProcess = spawn(config.containerProvider, cleanupArgs);
+                await new Promise<void>((resolve, reject) => {
+                    cleanupProcess.on('exit', (code) => {
+                        if (code === 0) return resolve();
+                        let error = '';
+                        cleanupProcess.stderr.on('data', (data) => error += data.toString());
+                        cleanupProcess.stderr.on('end', () => reject(new Error(`Failed to clean up container: ${error}`)));
+                    });
+                });
+            } catch (err) {
+                console.error(`Failed to clean up container ${containerName}:`, err);
+            }
+        }
+    }
+    containerPool = {};
+    console.log("Container pool cleaned up.");
+}
