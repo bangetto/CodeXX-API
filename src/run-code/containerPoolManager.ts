@@ -1,9 +1,9 @@
 import config from "../utils/config";
 import { spawn } from "child_process";
 
-async function startContainer(language: string, i: number): Promise<void> {
+async function startContainer(containerName: string, language: string, i: number): Promise<void> {
     const containerArgs = [
-        'run', '-d', '--name', `codexx-premarm-${language}-${i}`,
+        'run', '-d', '--name', containerName,
         '--network=none',
         `${language}-compile-run`,
         'sleep', 'infinity'
@@ -26,18 +26,19 @@ export async function initializeContainerPool() {
     console.log(`Initializing container pool with provider: ${config.containerProvider}`);
     for (const language in config.instructions) {
         const instr = config.instructions[language];
-        if (instr.prewarmCount && instr.prewarmCount > 0) {
-            console.log(`Prewarming ${instr.prewarmCount} containers for language: ${language}`);
+        if (instr.preWarmCount && instr.preWarmCount > 0) {
+            console.log(`Prewarming ${instr.preWarmCount} containers for language: ${language}`);
             containerPool[language] = [];
-            for (let i = 0; i < instr.prewarmCount; i++) {
+            for (let i = 0; i < instr.preWarmCount; i++) {
                 const containerName = `codexx-prewarm-${language}-${i}`;
                 try {
-                    await startContainer(containerName, i);
+                    await startContainer(containerName, language, i);
                     containerPool[language].push(containerName);
                 } catch (err) {
                     console.error(`Failed to prewarm container ${containerName}:`, err);
                 };
             }
+            console.log(`Prewarmed ${containerPool[language].length} containers for language: ${language}`);
         }
     }
 }
@@ -63,26 +64,45 @@ export function returnContainer(language: string, containerName: string): void {
     console.log(`Returned container: ${containerName} to pool for language: ${language}`);
 }
 
+let cleaningUp = false;
 export async function cleanupContainerPool(): Promise<void> {
+    if (cleaningUp) {
+        return;
+    }
+    cleaningUp = true;
     console.log("Cleaning up container pool...");
+    const cleanupPromises: Promise<void>[] = [];
+
     for (const language in containerPool) {
         for (const containerName of containerPool[language]) {
-            try {
+            const promise = new Promise<void>((resolve) => {
                 const cleanupArgs = ['rm', '-f', containerName];
                 const cleanupProcess = spawn(config.containerProvider, cleanupArgs);
-                await new Promise<void>((resolve, reject) => {
-                    cleanupProcess.on('exit', (code) => {
-                        if (code === 0) return resolve();
-                        let error = '';
-                        cleanupProcess.stderr.on('data', (data) => error += data.toString());
-                        cleanupProcess.stderr.on('end', () => reject(new Error(`Failed to clean up container: ${error}`)));
-                    });
+
+                let errorOutput = '';
+                cleanupProcess.stderr.on('data', (data) => {
+                    errorOutput += data.toString();
                 });
-            } catch (err) {
-                console.error(`Failed to clean up container ${containerName}:`, err);
-            }
+
+                cleanupProcess.on('close', (code) => {
+                    if (code !== 0) {
+                        console.error(`Failed to clean up container ${containerName} (exit code: ${code}): ${errorOutput}`);
+                    }
+                    // Always resolve to ensure Promise.all doesn't fail fast.
+                    resolve();
+                });
+
+                cleanupProcess.on('error', (err) => {
+                    console.error(`Error spawning cleanup process for ${containerName}:`, err);
+                    // Always resolve.
+                    resolve();
+                });
+            });
+            cleanupPromises.push(promise);
         }
     }
+    console.log(`Cleaning up ${cleanupPromises.length} containers...`);
+    await Promise.all(cleanupPromises);
     containerPool = {};
     console.log("Container pool cleaned up.");
 }

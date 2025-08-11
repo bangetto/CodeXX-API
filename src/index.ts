@@ -7,6 +7,7 @@ import { info } from "./run-code/info";
 import config from "./utils/config";
 import { initializeContainerPool, cleanupContainerPool } from "./run-code/containerPoolManager";
 import { ensureContainerProviderReady } from "./utils/containerProviderManager";
+import { uptime } from "process";
 
 async function startUp() {
     try {
@@ -47,7 +48,7 @@ async function startUp() {
         } catch (err: unknown) {
             const status = (err as any)?.status ?? 500;
             const message = (err as any)?.message ?? 'Internal Server Error';
-            // Optionally log stack server-side:
+            // log stack server-side:
             if (status >= 500) console.error('runCode error:', err);
             sendResponse(res, status, { error: message });
         }
@@ -66,7 +67,11 @@ async function startUp() {
     });
 
     app.get('/status', (req: Request, res: Response) => {
-        sendResponse(res, 200, null);
+        sendResponse(res, 200, {
+            status: 'ok',
+            uptime: process.uptime(),
+            version: config.version
+        });
     });
 
     const server = app.listen(port, '0.0.0.0', () => {

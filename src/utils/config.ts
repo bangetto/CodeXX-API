@@ -1,7 +1,7 @@
 import configData from './../../config.json';
 
 export interface Instruction {
-    prewarmCount?: number;
+    preWarmCount?: number;
     compileCodeCommand?: string;
     compilationArgs?: string[];
     executeCodeCommand: string;

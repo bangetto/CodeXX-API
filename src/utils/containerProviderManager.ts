@@ -13,6 +13,11 @@ async function checkContainerProviderReadiness(): Promise<boolean> {
         const timeout = setTimeout(() => done(false), 5000); // avoid indefinite hang
         try {
             const child = spawn(config.containerProvider, ['info']);
+            const timeout = setTimeout(() => {
+                child.kill('SIGTERM');
+                done(false);
+            }, 5000); // avoid indefinite hang
+
             child.once('close', (code) => {
                 clearTimeout(timeout);
                 done(code === 0);
@@ -36,16 +41,25 @@ async function attemptToStartContainerProvider(): Promise<boolean> {
     if (!config.containerProviderStartupCommand) {
         return false;
     }
-
-    console.log("Container provider not detected. Attempting to start it...");
-
     return new Promise((resolve) => {
         const [command, ...args] = config.containerProviderStartupCommand!.split(' ');
         const child = spawn(command, args);
         let settled = false;
 
+        // 30 second timeout for startup
+        const timeout = setTimeout(() => {
+            if (!settled) {
+                child.kill('SIGTERM');
+                settled = true;
+                console.error('Container provider startup command timed out');
+                resolve(false);
+            }
+        }, 30000);
+
         child.once('close', (code) => {
             if (settled) return;
+            clearTimeout(timeout);
+
             if (code !== 0) {
                 console.error(`The configured startup command failed with exit code ${code}.`);
                 settled = true;
@@ -62,9 +76,10 @@ async function attemptToStartContainerProvider(): Promise<boolean> {
 
         child.once('error', (err) => {
             if (settled) return;
-            console.error("Failed to execute the configured startup command:", err.message);
-            settled = true;
-            resolve(false);
+                clearTimeout(timeout);
+                console.error("Failed to execute the configured startup command:", err.message);
+                settled = true;
+                resolve(false);
         });
     });
 }
