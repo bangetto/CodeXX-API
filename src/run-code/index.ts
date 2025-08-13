@@ -4,7 +4,7 @@ import { removeCodeFile } from "../file-system/removeCodeFile";
 import { info } from "./info";
 import { spawn, ChildProcess } from "child_process";
 import config from "../utils/config";
-import { getContainer } from "./containerPoolManager";
+import { getContainer, returnContainer } from "./containerPoolManager";
 
 interface TestingVal {
     input: string;
@@ -127,12 +127,19 @@ export async function runCode({ language = "", code = "", input = "", tests = []
 
     const { jobID, filePath } = await createCodeFile(language, code);
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
-    const containerName = `codexx-runner-${language}-${jobID}`;
     let startProcess: ChildProcess | undefined;
+    let containerName = getContainer(language);
     
-    try {
+    if(!containerName || containerName === "") {
+        console.log(`No available container for language: ${language}. Starting a new container...`);
+        containerName = `codexx-runner-${language}-${jobID}`;
         startProcess = await startContainer(containerName, filePath, language);
+    } else {
+        const copyFileProcces = spawn(config.containerProvider, ['cp', `${filePath}/.`, `${containerName}:/code/`]);
+        await handleSpawn(copyFileProcces, (error) => new Error(`Failed to copy code file to container: ${error}`));
+    }
 
+    try {
         if (compileCodeCommand) {
             await compileInContainer(containerName, compileCodeCommand, compilationArgs);
         }
@@ -171,7 +178,8 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         } catch (error) {
             console.error(`Error during cleanup for jobID: ${jobID}`, error);
         } finally {
-            startProcess?.kill('SIGKILL');
+            if(startProcess) startProcess.kill('SIGKILL');
+            else returnContainer(language, containerName);
             removeCodeFile(jobID);
             console.log(`Cleaned up jobID: ${jobID}`);
         }

@@ -48,7 +48,7 @@ async function startUp() {
             const status = (err as any)?.status ?? 500;
             const message = (err as any)?.message ?? 'Internal Server Error';
             // log stack server-side:
-            if (status >= 500) console.error('runCode error:', err);
+            if (status != 500) console.error('runCode error:', err);
             sendResponse(res, status, { error: message });
         }
     });
@@ -67,40 +67,44 @@ async function startUp() {
 
     app.get('/status', (req: Request, res: Response) => {
         sendResponse(res, 200, {
-            status: 'ok',
             uptime: process.uptime(),
             version: config.version
         });
     });
 
     const server = app.listen(port, '0.0.0.0', () => {
+        console.log();
         if(config.version < 1) console.warn("Warning: This is an in development version of the API. Please report any issues you find.");
-        console.log(`API running at http://localhost:${port}\n\n`);
+        console.log(`API running at http://localhost:${port}\n`);
     });
 
-    function gracefulShutdown(signal: string) {
+    async function gracefulShutdown(signal: string) {
         console.log(`\nReceived ${signal}, shutting down gracefully...`);
-        server.close(() => {
-            console.log('HTTP server closed.');
-            cleanupContainerPool().then(() => {
-                console.log('Container pool cleaned up.');
-                process.exit(0);
-            }).catch(err => {
-                console.error('Error during container pool cleanup:', err);
-                process.exit(1);
-            });
-            process.exit(0);
-        });
-        // set a timeout to force exit if not closed in 30s
-        setTimeout(() => {
+        const forceExitTimer = setTimeout(() => {
             console.error('Could not close connections in time, forcefully shutting down');
             cleanupContainerPool().catch(err => {
                 console.error('Error during forced container pool cleanup:', err);
             });
             process.exit(1);
         }, 30000);
+        try {
+            await new Promise<void>((resolve, reject) => {
+                server.close(err => {
+                    if (err) return reject(err);
+                    console.log('HTTP server closed.');
+                    resolve();
+                });
+            });
+            await cleanupContainerPool();
+            console.log('Proceeding with exit...');
+            clearTimeout(forceExitTimer);
+            process.exit(0);
+        } catch (err) {
+            console.error('Error during graceful shutdown:', err);
+            clearTimeout(forceExitTimer);
+            process.exit(1);
+        }
     }
-
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGINT', async () => await gracefulShutdown('SIGINT'));
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 })();

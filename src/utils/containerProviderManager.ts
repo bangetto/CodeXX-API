@@ -1,6 +1,8 @@
 import config from "./config";
 import { spawn } from "child_process";
 
+const readinessTimeout = 5000; // 5 seconds
+
 async function checkContainerProviderReadiness(): Promise<boolean> {
     return new Promise((resolve) => {
         let settled = false;
@@ -10,15 +12,16 @@ async function checkContainerProviderReadiness(): Promise<boolean> {
                 resolve(ok);
             }
         };
-        const timeout = setTimeout(() => done(false), 5000); // avoid indefinite hang
+        const timeout = setTimeout(() => done(false), readinessTimeout); // avoid indefinite hang
         try {
             const child = spawn(config.containerProvider, ['info']);
-            const timeout = setTimeout(() => {
+            const killTimer = setTimeout(() => {
                 child.kill('SIGTERM');
                 done(false);
-            }, 5000); // avoid indefinite hang
+            }, readinessTimeout); // avoid indefinite hang
 
             child.once('close', (code) => {
+                clearTimeout(killTimer);
                 clearTimeout(timeout);
                 done(code === 0);
             });
@@ -42,8 +45,8 @@ async function attemptToStartContainerProvider(): Promise<boolean> {
         return false;
     }
     return new Promise((resolve) => {
-        const [command, ...args] = config.containerProviderStartupCommand!.split(' ');
-        const child = spawn(command, args);
+        // dirrectly use command from config
+        const child = spawn(config.containerProviderStartupCommand!, { shell: true });
         let settled = false;
 
         // 30 second timeout for startup

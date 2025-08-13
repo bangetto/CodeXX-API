@@ -70,7 +70,7 @@ export async function cleanupContainerPool(): Promise<void> {
         return;
     }
     cleaningUp = true;
-    console.log("Cleaning up container pool...");
+    console.log("Starting container pool cleanup. Preparing to remove all prewarmed containers...");
     const cleanupPromises: Promise<void>[] = [];
 
     for (const language in containerPool) {
@@ -101,7 +101,7 @@ export async function cleanupContainerPool(): Promise<void> {
             cleanupPromises.push(promise);
         }
     }
-    console.log(`Cleaning up ${cleanupPromises.length} containers...`);
+    console.log(`Initiating removal of ${cleanupPromises.length} containers...`);
     await Promise.all(cleanupPromises);
     containerPool = {};
     console.log("Container pool cleaned up.");
