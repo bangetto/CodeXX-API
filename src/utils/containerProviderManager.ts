@@ -71,7 +71,7 @@ async function attemptToStartContainerProvider(): Promise<boolean> {
                     settled = true;
                     resolve(true);
                 }
-            }, 3000);
+            }, 6000);
         });
 
         child.once('error', (err) => {

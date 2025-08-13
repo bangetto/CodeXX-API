@@ -4,6 +4,7 @@ import { removeCodeFile } from "../file-system/removeCodeFile";
 import { info } from "./info";
 import { spawn, ChildProcess } from "child_process";
 import config from "../utils/config";
+import { getContainer } from "./containerPoolManager";
 
 interface TestingVal {
     input: string;
@@ -34,24 +35,33 @@ function normalizeOutput(str: string): string {
         .trim(); // Remove leading/trailing newlines
 }
 
-function executeCleanupCommand(command: string, args: string[]): Promise<void> {
+function handleSpawn(
+    process: ChildProcess, 
+    rejectionValue: (error: string, code: number | null) => any
+): Promise<void> {
     return new Promise((resolve, reject) => {
-        const process = spawn(command, args);
-        let errorOutput = '';
-        process.stderr.on('data', (data) => {
-            errorOutput += data.toString();
-        });
+        let error = '';
+        if (process.stderr) {
+            process.stderr.on('data', (data) => {
+                error += data.toString();
+            });
+        }
         process.on('close', (code) => {
             if (code === 0) {
                 resolve();
             } else {
-                reject(new Error(`Command failed with code ${code}: ${command} ${args.join(' ')}\n${errorOutput}`));
+                reject(rejectionValue(error, code));
             }
         });
         process.on('error', (err) => {
             reject(err);
         });
     });
+}
+
+function executeCleanupCommand(command: string, args: string[]): Promise<void> {
+    const process = spawn(command, args);
+    return handleSpawn(process, (error, code) => new Error(`Command failed with code ${code}: ${command} ${args.join(' ')}\n${error}`));
 }
 
 async function startContainer(containerName: string, dirPath: string, language: string): Promise<ChildProcess> {
@@ -63,28 +73,14 @@ async function startContainer(containerName: string, dirPath: string, language: 
         'sleep', 'infinity'
     ];
     const startProcess = spawn(config.containerProvider, containerArgs);
-    await new Promise<void>((resolve, reject) => {
-        startProcess.on('exit', (code) => {
-            if (code === 0) return resolve();
-            let error = '';
-            startProcess.stderr.on('data', (data) => error += data.toString());
-            startProcess.stderr.on('end', () => reject(new Error(`Failed to start container: ${error}`)));
-        });
-    });
+    await handleSpawn(startProcess, (error) => new Error(`Failed to start container: ${error}`));
     return startProcess;
 }
 
 async function compileInContainer(containerName: string, compileCommand: string, compilationArgs: string[] | undefined) {
     const compileArgs = ['exec', containerName, compileCommand, ...(compilationArgs || [])];
-    await new Promise<void>((resolve, reject) => {
-        const compileProcess = spawn(config.containerProvider, compileArgs);
-        let error = '';
-        compileProcess.stderr.on('data', (data) => error += data.toString());
-        compileProcess.on('exit', (code) => {
-            if (code === 0) return resolve();
-            reject({ status: 200, output: '', error });
-        });
-    });
+    const compileProcess = spawn(config.containerProvider, compileArgs);
+    await handleSpawn(compileProcess, (error) => ({ status: 200, output: '', error }));
 }
 
 function executeWithInputInContainer(containerName: string, executeCommand: string, executionArgs: string[] | undefined, inputStr: string, timeout: number): Promise<{ output: string; error: string }> {
@@ -117,6 +113,7 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
     });
 }
 
+
 export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
     const timeout = 30;
 
@@ -132,7 +129,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
     const containerName = `codexx-runner-${language}-${jobID}`;
     let startProcess: ChildProcess | undefined;
-
+    
     try {
         startProcess = await startContainer(containerName, filePath, language);
 
