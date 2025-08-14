@@ -41,8 +41,7 @@ export function getContainer(language: string): string {
         return '';
     }
     const containerName = containerPool[language].pop();
-    if (!containerName) return '';
-    return containerName;
+    return containerName || '';
 }
 
 export async function returnContainer(language: string, containerName: string): Promise<void> {
@@ -50,8 +49,8 @@ export async function returnContainer(language: string, containerName: string): 
         containerPool[language] = [];
     }
     try {
-        const cleanUpDirProcces = spawn(config.containerProvider, ['exec', containerName, 'rm', '-rf', '/code/*']);
-        await handleSpawn(cleanUpDirProcces, (error) => new Error(`Failed to clean up container directory: ${error}`));
+        const cleanUpDirProcces = spawn(config.containerProvider, ['exec', containerName, 'sh', '-c', 'rm -rf /code/*']);
+        await handleSpawn(cleanUpDirProcces,(error) => new Error(`Failed to clean up container directory: ${error}`));
         containerPool[language].push(containerName);
         // console.log(`Returned container: ${containerName} to pool for language: ${language}`); // debug
     } catch (error) {

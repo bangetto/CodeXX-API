@@ -112,8 +112,8 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         containerName = `codexx-runner-${language}-${jobID}`;
         startProcess = await startContainer(containerName, filePath, language);
     } else {
-        const copyFileProcces = spawn(config.containerProvider, ['cp', `${filePath}/.`, `${containerName}:/code/`]);
-        await handleSpawn(copyFileProcces, (error) => new Error(`Failed to copy code file to container: ${error}`));
+        const copyFileProccess = spawn(config.containerProvider, ['cp', `${filePath}/.`, `${containerName}:/code/`]);
+        await handleSpawn(copyFileProccess, (error) => new Error(`Failed to copy code file to container: ${error}`));
     }
 
     try {

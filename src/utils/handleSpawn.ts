@@ -1,24 +1,34 @@
-import { ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
 
 export default function handleSpawn(
-    process: ChildProcess, 
-    rejectionValue: (error: string, code: number | null) => any
+    childProcess: ChildProcess,
+    rejectionValue: (stderr: string, code: number | null) => unknown
 ): Promise<void> {
     return new Promise((resolve, reject) => {
-        let error = '';
-        if (process.stderr) {
-            process.stderr.on('data', (data) => {
-                error += data.toString();
-            });
+        let stderr = '';
+        const onData = (chunk: Buffer) => {
+            stderr += chunk.toString('utf8');
+        };
+        if (childProcess.stderr) {
+            childProcess.stderr.on('data', onData);
         }
-        process.on('close', (code) => {
+        const cleanup = () => {
+            if (childProcess.stderr) {
+                childProcess.stderr.removeListener('data', onData);
+            }
+        };
+        childProcess.once('close', (code) => {
             if (code === 0) {
+                cleanup();
                 resolve();
             } else {
-                reject(rejectionValue(error, code));
+                const rejection = rejectionValue(stderr, code);
+                cleanup();
+                reject(rejection instanceof Error ? rejection : new Error(String(rejection)));
             }
         });
-        process.on('error', (err) => {
+        childProcess.once('error', (err: Error) => {
+            cleanup();
             reject(err);
         });
     });

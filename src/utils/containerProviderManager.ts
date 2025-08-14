@@ -6,31 +6,40 @@ const readinessTimeout = 5000; // 5 seconds
 async function checkContainerProviderReadiness(): Promise<boolean> {
     return new Promise((resolve) => {
         let settled = false;
+        let timeout: NodeJS.Timeout | undefined;
+        let killTimer: NodeJS.Timeout | undefined;
         const done = (ok: boolean) => {
-            if (!settled) {
-                settled = true;
-                resolve(ok);
-            }
+            if (settled) return;
+            settled = true;
+            if (timeout) clearTimeout(timeout);
+            if (killTimer) clearTimeout(killTimer);
+            resolve(ok);
         };
-        const timeout = setTimeout(() => done(false), readinessTimeout); // avoid indefinite hang
+        timeout = setTimeout(() => {
+            if (killTimer) clearTimeout(killTimer);
+            done(false);
+        }, readinessTimeout);
         try {
             const child = spawn(config.containerProvider, ['info']);
-            const killTimer = setTimeout(() => {
+            killTimer = setTimeout(() => {
                 child.kill('SIGTERM');
+                if (timeout) clearTimeout(timeout);
                 done(false);
-            }, readinessTimeout); // avoid indefinite hang
+            }, readinessTimeout);
 
             child.once('close', (code) => {
-                clearTimeout(killTimer);
-                clearTimeout(timeout);
+                if (killTimer) clearTimeout(killTimer);
+                if (timeout) clearTimeout(timeout);
                 done(code === 0);
             });
             child.once('error', () => {
-                clearTimeout(timeout);
+                if (killTimer) clearTimeout(killTimer);
+                if (timeout) clearTimeout(timeout);
                 done(false);
             });
         } catch (err) {
-            clearTimeout(timeout);
+            if (killTimer) clearTimeout(killTimer);
+            if (timeout) clearTimeout(timeout);
             console.error(
                 "Failed to execute container provider info:",
                 (err as Error).message
@@ -45,7 +54,7 @@ async function attemptToStartContainerProvider(): Promise<boolean> {
         return false;
     }
     return new Promise((resolve) => {
-        // dirrectly use command from config
+        // directly use command from config
         const child = spawn(config.containerProviderStartupCommand!, { shell: true });
         let settled = false;
 
@@ -79,10 +88,10 @@ async function attemptToStartContainerProvider(): Promise<boolean> {
 
         child.once('error', (err) => {
             if (settled) return;
-                clearTimeout(timeout);
-                console.error("Failed to execute the configured startup command:", err.message);
-                settled = true;
-                resolve(false);
+            clearTimeout(timeout);
+            console.error("Failed to execute the configured startup command:", err.message);
+            settled = true;
+            resolve(false);
         });
     });
 }
