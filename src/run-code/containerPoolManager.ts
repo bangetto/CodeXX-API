@@ -1,5 +1,6 @@
 import config from "../utils/config";
 import { spawn } from "child_process";
+import handleSpawn from "../utils/handleSpawn";
 
 async function startContainer(containerName: string, language: string, i: number): Promise<void> {
     const containerArgs = [
@@ -9,15 +10,7 @@ async function startContainer(containerName: string, language: string, i: number
         'sleep', 'infinity'
     ];
     const container = spawn(config.containerProvider, containerArgs);
-    return await new Promise<void>((resolve, reject) => {
-        container.on('exit', (code) => {
-            if (code === 0) return resolve();
-            let error = '';
-            container.stderr.on('data', (data) => error += data.toString());
-            container.stderr.on('end', () => reject(new Error(`Failed to start container: ${error}`)));
-        });
-    });
-
+    await handleSpawn(container, (error) => new Error(`Failed to start container: ${error}`));
 }
 
 let containerPool: { [language: string]: string[] } = {};
@@ -48,20 +41,22 @@ export function getContainer(language: string): string {
         return '';
     }
     const containerName = containerPool[language].pop();
-    if (!containerName) {
-        console.warn(`No available pre-warmed container for language: ${language}`);
-        return '';
-    }
-    console.log(`Using prewarmed container: ${containerName} for language: ${language}`);
+    if (!containerName) return '';
     return containerName;
 }
 
-export function returnContainer(language: string, containerName: string): void {
+export async function returnContainer(language: string, containerName: string): Promise<void> {
     if (!containerPool[language]) {
         containerPool[language] = [];
     }
-    containerPool[language].push(containerName);
-    console.log(`Returned container: ${containerName} to pool for language: ${language}`);
+    try {
+        const cleanUpDirProcces = spawn(config.containerProvider, ['exec', containerName, 'rm', '-rf', '/code/*']);
+        await handleSpawn(cleanUpDirProcces, (error) => new Error(`Failed to clean up container directory: ${error}`));
+        containerPool[language].push(containerName);
+        // console.log(`Returned container: ${containerName} to pool for language: ${language}`); // debug
+    } catch (error) {
+        console.error(`Failed to return container ${containerName} to pool for language ${language}:`, error);
+    }
 }
 
 let cleaningUp = false;
