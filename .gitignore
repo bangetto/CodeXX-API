@@ -2,5 +2,13 @@ node_modules/
 codes/
 classes/
 dist/
-start.bat
+tmp/
+*.bat
 *.zip
+*.md
+
++!/README.md
++!/CHANGELOG.md
++!/CONTRIBUTING.md
++!/CODE_OF_CONDUCT.md
++!/.github/**/*.md
