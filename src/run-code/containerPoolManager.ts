@@ -17,23 +17,28 @@ let containerPool: { [language: string]: string[] } = {};
 
 export async function initializeContainerPool() {
     console.log(`Initializing container pool with provider: ${config.containerProvider}`);
+    const preWarmPromises: Promise<void>[] = [];
     for (const language in config.instructions) {
         const instr = config.instructions[language];
         if (instr.preWarmCount && instr.preWarmCount > 0) {
-            console.log(`Prewarming ${instr.preWarmCount} containers for language: ${language}`);
             containerPool[language] = [];
             for (let i = 0; i < instr.preWarmCount; i++) {
-                const containerName = `codexx-prewarm-${language}-${i}`;
-                try {
-                    await startContainer(containerName, language, i);
-                    containerPool[language].push(containerName);
-                } catch (err) {
-                    console.error(`Failed to prewarm container ${containerName}:`, err);
-                };
+                const startPromise = new Promise<void>(async (resolve) => {
+                    const containerName = `codexx-prewarm-${language}-${i}`;
+                    try {
+                        await startContainer(containerName, language, i);
+                        containerPool[language].push(containerName);
+                    } catch (err) {
+                        console.error(`Failed to prewarm container ${containerName}:`, err);
+                    }
+                    return resolve();
+                });
+                preWarmPromises.push(startPromise);
             }
-            console.log(`Prewarmed ${containerPool[language].length} containers for language: ${language}`);
         }
     }
+    await Promise.all(preWarmPromises);
+    console.log("Container pool initialized.");
 }
 
 export function getContainer(language: string): string {

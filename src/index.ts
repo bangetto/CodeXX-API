@@ -12,7 +12,7 @@ async function startUp() {
     try {
         console.log("Starting up the CodeXX API...");
         await ensureContainerProviderReady();
-        initializeContainerPool();
+        await initializeContainerPool();
     } catch (error: any) {
         console.error(`Fatal startup error: ${error.message}`);
         process.exit(1);
