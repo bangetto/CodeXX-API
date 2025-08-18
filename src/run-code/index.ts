@@ -107,7 +107,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     let startProcess: ChildProcess | undefined;
     let containerName = getContainer(language);
     
-    if(!containerName || containerName === "") {
+    if(!containerName) {
         console.log(`No available container for language: ${language}. Starting a new container...`);
         containerName = `codexx-runner-${language}-${jobID}`;
         startProcess = await startContainer(containerName, filePath, language);

@@ -41,12 +41,12 @@ export async function initializeContainerPool() {
     console.log("Container pool initialized.");
 }
 
-export function getContainer(language: string): string {
+export function getContainer(language: string): string | null {
     if (!containerPool[language] || containerPool[language].length === 0) {
-        return '';
+        return null;
     }
     const containerName = containerPool[language].pop();
-    return containerName || '';
+    return containerName || null;
 }
 
 export async function returnContainer(language: string, containerName: string): Promise<void> {

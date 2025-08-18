@@ -27,7 +27,7 @@ async function getLanguageInfo(language: string): Promise<[string, string]> {
     const container = getContainer(language);
     try {
         let result: string;
-        if (!container || container === '') {
+        if (!container) {
             result = await getCompilerInfoFromNewContainer(language);
         } else {
             const { compilerInfoCommand } = commandMap('', language);
@@ -39,7 +39,7 @@ async function getLanguageInfo(language: string): Promise<[string, string]> {
         }
         return [language, result];
     } finally {
-        if (container || container === '') {
+        if (container) {
             await returnContainer(language, container);
         }
     }
