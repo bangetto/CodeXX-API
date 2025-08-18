@@ -3,7 +3,7 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import { runCode } from "./run-code";
 import { supportedLanguages } from "./run-code/instructions";
-import { info } from "./run-code/info";
+import info, { initInfo } from "./run-code/info";
 import config from "./utils/config";
 import { initializeContainerPool, cleanupContainerPool } from "./run-code/containerPoolManager";
 import { ensureContainerProviderReady } from "./utils/containerProviderManager";
@@ -13,8 +13,14 @@ async function startUp() {
         console.log("Starting up the CodeXX API...");
         await ensureContainerProviderReady();
         await initializeContainerPool();
+        await initInfo();
     } catch (error: any) {
         console.error(`Fatal startup error: ${error.message}`);
+        console.info("\nEnsure that you configured everything correctly, if you are unsure, please visit the wiki: https://github.com/bangetto/CodeXX-API/wiki");
+        console.info("If you are still having issues, please open an issue on GitHub: https://github.com/bangetto/CodeXX-API/issues");
+        console.error("\nCleaning up container pool before exiting...");
+        await cleanupContainerPool();
+        console.error("Exiting...");
         process.exit(1);
     }
 }
@@ -56,9 +62,9 @@ async function startUp() {
     app.get('/list', async (req: Request, res: Response) => {
         // Fetch info for all languages in parallel
         const body = await Promise.all(
-            supportedLanguages.map(async (language: any) => ({
+            supportedLanguages.map(async (language: string) => ({
                 language,
-                info: await info(language),
+                info: info(language),
             }))
         );
 

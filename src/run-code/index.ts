@@ -1,7 +1,7 @@
 import { commandMap, supportedLanguages } from "./instructions";
 import { createCodeFile } from "../file-system/createCodeFile";
 import { removeCodeFile } from "../file-system/removeCodeFile";
-import { info } from "./info";
+import info from "./info";
 import { spawn, ChildProcess } from "child_process";
 import config from "../utils/config";
 import { getContainer, returnContainer } from "./containerPoolManager";
@@ -146,7 +146,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             error = result.error;
         }
 
-        return { output, testResults, error, language, info: await info(language) };
+        return { output, testResults, error, language, info: info(language) };
 
     } finally {
         if (startProcess) {
