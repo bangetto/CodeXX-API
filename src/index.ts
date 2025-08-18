@@ -60,13 +60,10 @@ async function startUp() {
     });
 
     app.get('/list', async (req: Request, res: Response) => {
-        // Fetch info for all languages in parallel
-        const body = await Promise.all(
-            supportedLanguages.map(async (language: string) => ({
-                language,
-                info: info(language),
-            }))
-        );
+        let body: { [language: string]: { info: string } } = {};
+        for(const language of supportedLanguages) {
+            body[language] = { info: info(language) };
+        }
 
         sendResponse(res, 200, { supportedLanguages: body, version: config.version });
     });
