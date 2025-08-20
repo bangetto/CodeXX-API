@@ -109,5 +109,5 @@ async function startUp() {
         }
     }
     process.on('SIGINT', async () => await gracefulShutdown('SIGINT'));
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGTERM', async () => await gracefulShutdown('SIGTERM'));
 })();

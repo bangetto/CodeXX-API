@@ -27,15 +27,6 @@ interface RunCodeResult {
     info: string;
 }
 
-function normalizeOutput(str: string): string {
-    return str
-        .replace(/\r\n|\r/g, '\n') // Normalize line endings
-        .split('\n')
-        .map(line => line.trimEnd()) // Remove trailing spaces on each line
-        .join('\n')
-        .trim(); // Remove leading/trailing newlines
-}
-
 function executeCleanupCommand(command: string, args: string[]): Promise<void> {
     const process = spawn(command, args);
     return handleSpawn(process, (error, code) => new Error(`Command failed with code ${code}: ${command} ${args.join(' ')}\n${error}`));
@@ -102,7 +93,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         };
     }
 
-    const { jobID, filePath } = await createCodeFile(language, code);
+    const { jobID, dirPath } = await createCodeFile(language, code);
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
     let startProcess: ChildProcess | undefined;
     let containerName = getContainer(language);
@@ -110,9 +101,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     if(!containerName) {
         console.log(`No available container for language: ${language}. Starting a new container...`);
         containerName = `codexx-runner-${language}-${jobID}`;
-        startProcess = await startContainer(containerName, filePath, language);
+        startProcess = await startContainer(containerName, dirPath, language);
     } else {
-        const copyFileProccess = spawn(config.containerProvider, ['cp', `${filePath}/.`, `${containerName}:/code/`]);
+        const copyFileProccess = spawn(config.containerProvider, ['cp', `${dirPath}/.`, `${containerName}:/code/`]);
         await handleSpawn(copyFileProccess, (error) => new Error(`Failed to copy code file to container: ${error}`));
     }
 
@@ -136,7 +127,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
                 } else {
                     testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
                     if (test.output) {
-                        testResults[i].passed = normalizeOutput(result.output) === normalizeOutput(test.output);
+                        testResults[i].passed = testResults[i].output === test.output.replace(/\r\n|\r/g, '\n');
                     }
                 }
             }
