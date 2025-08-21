@@ -1,17 +1,19 @@
 {
-    "version": 0.1,
-    "instructions": [
-        {
-            "language": "cpp",
+    "version": 0.2,
+    "instructions": {
+        "cpp": {
+            "preWarmCount": 3,
             "compileCodeCommand": "g++",
             "compilationArgs": [
-                "${CODES_DIR}/${jobID}.cpp",
+                "main.cpp",
                 "-o",
-                "${OUTPUTS_DIR}/${jobID}.out"
+                "main.exe",
+                "-O2"
             ],
-            "executeCodeCommand": "${OUTPUTS_DIR}/${jobID}.out",
-            "outputExt": "out",
+            "executeCodeCommand": "./main.exe",
             "compilerInfoCommand": "g++ --version"
         }
-    ]
+    },
+    "containerProvider": "podman",
+    "containerProviderStartupCommand": "podman machine start"
 }

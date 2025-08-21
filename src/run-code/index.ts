@@ -1,12 +1,15 @@
 import { commandMap, supportedLanguages } from "./instructions";
 import { createCodeFile } from "../file-system/createCodeFile";
 import { removeCodeFile } from "../file-system/removeCodeFile";
-import { info } from "./info";
-import { spawn } from "child_process";
+import info from "./info";
+import { spawn, ChildProcess } from "child_process";
+import config from "../utils/config";
+import { getContainer, returnContainer } from "./containerPoolManager";
+import handleSpawn from "../utils/handleSpawn";
 
 interface TestingVal {
     input: string;
-    output?: string
+    output?: string;
 }
 
 interface RunCodeParams {
@@ -18,134 +21,138 @@ interface RunCodeParams {
 
 interface RunCodeResult {
     output?: string;
-    testResults?: {output: string; passed: boolean}[];
+    testResults?: { output: string; passed: boolean }[];
     error: string;
     language: string;
     info: string;
 }
 
-const ID = 1000; // this id is used to run the code as a non-root user
-
-function normalizeOutput(str: string): string {
-    return str
-        .replace(/\r\n|\r/g, '\n') // Normalize line endings
-        .split('\n')
-        .map(line => line.trimEnd()) // Remove trailing spaces on each line
-        .join('\n')
-        .trim(); // Remove leading/trailing newlines
+function executeCleanupCommand(command: string, args: string[]): Promise<void> {
+    const process = spawn(command, args);
+    return handleSpawn(process, (error, code) => new Error(`Command failed with code ${code}: ${command} ${args.join(' ')}\n${error}`));
 }
+
+async function startContainer(containerName: string, dirPath: string, language: string): Promise<ChildProcess> {
+    const containerArgs = [
+        'run', '-d', '--name', containerName,
+        '-v', `${dirPath}:/code`,
+        '--user', `${1000}:${1000}`,
+        '--network=none', `${language}-compile-run`,
+        'sleep', 'infinity'
+    ];
+    const startProcess = spawn(config.containerProvider, containerArgs);
+    await handleSpawn(startProcess, (error) => new Error(`Failed to start container: ${error}`));
+    return startProcess;
+}
+
+async function compileInContainer(containerName: string, compileCommand: string, compilationArgs: string[] | undefined) {
+    const compileArgs = ['exec', containerName, compileCommand, ...(compilationArgs || [])];
+    const compileProcess = spawn(config.containerProvider, compileArgs);
+    await handleSpawn(compileProcess, (error) => ({ status: 200, output: '', error }));
+}
+
+function executeWithInputInContainer(containerName: string, executeCommand: string, executionArgs: string[] | undefined, inputStr: string, timeout: number): Promise<{ output: string; error: string }> {
+    return new Promise((resolve, reject) => {
+        const execArgs = ['exec', '-i', containerName, executeCommand, ...(executionArgs || [])];
+        const executeProcess = spawn(config.containerProvider, execArgs);
+        let output = '';
+        let error = '';
+        const timer = setTimeout(() => {
+            executeProcess.kill('SIGKILL');
+            reject({
+                status: 408,
+                error: `CodeXX API Timed Out. Your code took too long to execute, over ${timeout} seconds.`
+            });
+        }, timeout * 1000);
+
+        executeProcess.stdout.on('data', (data) => output += data.toString());
+        executeProcess.stderr.on('data', (data) => error += data.toString());
+
+        executeProcess.on('exit', (code) => {
+            clearTimeout(timer);
+            const execError = code === 0? '': (error || `Process exited with code ${code}`);
+            resolve({ output, error: execError });
+        });
+
+        if (inputStr) {
+                    executeProcess.stdin.write(inputStr + '\n');
+        }
+        executeProcess.stdin.end();
+    });
+}
+
 
 export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
     const timeout = 30;
 
-    if (code === "")
-        throw {
-            status: 400,
-            error: "No Code found to execute."
-        }
-
-    if (!supportedLanguages.includes(language))
+    if (code === "") throw { status: 400, error: "No Code found to execute." };
+    if (!supportedLanguages.includes(language)) {
         throw {
             status: 400,
             error: `Entered language is not supported, for more information visit the wiki: https://github.com/bangetto/CodeXX-API/wiki. The languages currently supported are: ${supportedLanguages.join(', ')}.`
-        }
-
-    const { jobID } = await createCodeFile(language, code);
-    const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs, outputExt } = commandMap(jobID, language);
-
-    if (compileCodeCommand) {
-        await new Promise<void>((resolve, reject) => {
-            const compileCode = spawn(compileCodeCommand, compilationArgs || []);
-            compileCode.stderr.on('data', (error) => {
-                reject({
-                    status: 200,
-                    output: '',
-                    error: error.toString(),
-                    language
-                })
-            });
-            compileCode.on('exit', () => {
-                resolve();
-            });
-        });
+        };
     }
 
-    // Helper to run the code with a single input string
-    const runWithInput = (inputStr: string): Promise<{ output: string; error: string }> => {
-        return new Promise((resolve, reject) => {
-            const spawnOptions: any = { };
-            if (process.platform !== "win32") {
-                spawnOptions.uid = ID;
-                spawnOptions.gid = ID;
-            }
-            const executeCode = spawn(executeCodeCommand, executionArgs || [], spawnOptions);
-            let output = "", error = "";
+    const { jobID, dirPath } = await createCodeFile(language, code);
+    const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
+    let startProcess: ChildProcess | undefined;
+    let containerName = getContainer(language);
+    
+    if(!containerName) {
+        console.log(`No available container for language: ${language}. Starting a new container...`);
+        containerName = `codexx-runner-${language}-${jobID}`;
+        startProcess = await startContainer(containerName, dirPath, language);
+    } else {
+        const copyFileProccess = spawn(config.containerProvider, ['cp', `${dirPath}/.`, `${containerName}:/code/`]);
+        await handleSpawn(copyFileProccess, (error) => new Error(`Failed to copy code file to container: ${error}`));
+    }
 
-            const timer = setTimeout(async () => {
-                executeCode.kill("SIGHUP");
-                reject({
-                    status: 408,
-                    error: `CodeXX API Timed Out. Your code took too long to execute, over ${timeout} seconds. Make sure you are sending input as payload if your code expects an input.`
-                })
-            }, timeout * 1000);
+    try {
+        if (compileCodeCommand) {
+            await compileInContainer(containerName, compileCodeCommand, compilationArgs);
+        }
 
-            if (inputStr) {
-                executeCode.stdin.write(inputStr);
-            }
-            executeCode.stdin.end();
+        let testResults: { output: string; passed: boolean }[] | undefined = undefined;
+        let output: string | undefined = undefined;
+        let error: string = "";
 
-            executeCode.stdin.on('error', (err) => {
-                console.log('stdin err', err);
-            });
-
-            executeCode.stdout.on('data', (data) => {
-                output += data.toString();
-            });
-
-            executeCode.stderr.on('data', (data) => {
-                error += data.toString();
-            });
-
-            executeCode.on('exit', () => {
-                clearTimeout(timer);
-                resolve({ output, error });
-            });
-        });
-    };
-
-    let testResults: { output: string; passed: boolean }[] | undefined = undefined;
-    let output: string | undefined = undefined;
-    let error: string = "";
-
-    if (tests && tests.length > 0) {
-        testResults = [];
-        for (let i = 0; i < tests.length; i++) {
-            const test = tests[i];
-            const result = await runWithInput(test.input);
-            if (result.error) {
-                error = result.error;
-                break; // Stop on first error
-            } else {
-                testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
-                if(test.output) {
-                    testResults[i].passed = normalizeOutput(result.output) === normalizeOutput(test.output);
+        if (tests && tests.length > 0) {
+            testResults = [];
+            for (let i = 0; i < tests.length; i++) {
+                const test = tests[i];
+                const result = await executeWithInputInContainer(containerName, executeCodeCommand, executionArgs, test.input, timeout);
+                if (result.error) {
+                    error = result.error;
+                    break;
+                } else {
+                    testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
+                    if (test.output) {
+                        testResults[i].passed = testResults[i].output === test.output.replace(/\r\n|\r/g, '\n');
+                    }
                 }
             }
+        } else {
+            const result = await executeWithInputInContainer(containerName, executeCodeCommand, executionArgs, input, timeout);
+            output = result.output;
+            error = result.error;
         }
-    } else {
-        // Single input mode
-        const result = await runWithInput(input);
-        output = result.output;
-        error = result.error;
+
+        return { output, testResults, error, language, info: info(language) };
+
+    } finally {
+        if (startProcess) {
+            try {
+                await executeCleanupCommand(config.containerProvider, ['stop', containerName]);
+                await executeCleanupCommand(config.containerProvider, ['rm', containerName]);
+            } catch (error) {
+                console.error(`Error during cleanup for jobID: ${jobID}`, error);
+            } finally {
+                startProcess.kill('SIGKILL');
+            }
+        } else if (containerName) {
+            await returnContainer(language, containerName);
+        }
+        removeCodeFile(jobID);
+        console.log(`Cleaned up jobID: ${jobID}`);
     }
-
-    removeCodeFile(jobID, language, outputExt);
-
-    return {
-        output,
-        testResults,
-        error,
-        language,
-        info: await info(language)
-    };
 }

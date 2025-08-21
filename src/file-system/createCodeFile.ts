@@ -1,29 +1,25 @@
 import { v4 as getUUID } from "uuid";
-import { promises as fsPromises, existsSync, mkdirSync } from "fs";
+import { promises as fsPromises } from "fs";
 import { join } from "path";
 
-const CODES_DIR = process.env.CODES_DIR || "/tmp/codes";
-const OUTPUTS_DIR = process.env.OUTPUTS_DIR || "/tmp/outputs";
-
-if (!existsSync(CODES_DIR)) mkdirSync(CODES_DIR, { recursive: true });
-if (!existsSync(OUTPUTS_DIR)) mkdirSync(OUTPUTS_DIR, { recursive: true });
+const usrDir = process.env.USR_DIR || "./tmp";
 
 export interface CreateCodeFileResult {
     fileName: string;
-    filePath: string;
+    dirPath: string;
     jobID: string;
 }
 
 export async function createCodeFile(language: string, code: string): Promise<CreateCodeFileResult> {
     const jobID = getUUID();
-    const fileName = `${jobID}.${language}`;
-    const filePath = join(CODES_DIR, fileName);
-
-    await fsPromises.writeFile(filePath, code.toString());
+    const fileName = `main.${language}`;
+    const dirPath = join(usrDir, jobID);
+    await fsPromises.mkdir(dirPath, { recursive: true, mode: 0o700 });
+    await fsPromises.writeFile(join(dirPath, fileName), code.toString(), { encoding: "utf8", mode: 0o600 });
 
     return {
         fileName,
-        filePath,
+        dirPath,
         jobID,
     };
 };
