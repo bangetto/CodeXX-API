@@ -1,6 +1,5 @@
-import express, { Request, Response } from "express";
-import bodyParser from "body-parser";
-import cors from "cors";
+import fastify, { FastifyRequest, FastifyReply } from "fastify";
+import cors from "@fastify/cors";
 import { runCode } from "./run-code";
 import { supportedLanguages } from "./run-code/instructions";
 import info, { initInfo } from "./run-code/info";
@@ -27,17 +26,15 @@ async function startUp() {
 (async () => {
     await startUp();
 
-    const app = express();
+    const app = fastify();
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-    app.use(bodyParser.json());
-    app.use(bodyParser.urlencoded({ extended: true }));
-    app.use(cors());
+    app.register(cors);
 
-    const sendResponse = (res: Response, statusCode: number, body: any) => {
+    const sendResponse = (reply: FastifyReply, statusCode: number, body: any) => {
         const timeStamp = Date.now();
 
-        res.status(statusCode).send({
+        reply.status(statusCode).send({
             ...body,
             timeStamp,
             status: statusCode,
@@ -45,41 +42,46 @@ async function startUp() {
     };
 
 
-    app.post("/", async (req: Request, res: Response) => {
-        console.log(`Received request with language: ${req.body.language}`);
+    app.post("/", async (request: FastifyRequest, reply: FastifyReply) => {
+        console.log(`Received request with language: ${(request.body as any).language}`);
         try {
-            const output = await runCode(req.body);
-            sendResponse(res, 200, output);
+            const output = await runCode(request.body as any);
+            sendResponse(reply, 200, output);
         } catch (err: unknown) {
             const status = (err as any)?.status ?? 500;
             const message = (err as any)?.message ?? 'Internal Server Error';
             // log stack server-side:
             if (status != 500) console.error('runCode error:', err);
-            sendResponse(res, status, { error: message });
+            sendResponse(reply, status, { error: message });
         }
     });
 
-    app.get('/list', async (req: Request, res: Response) => {
+    app.get('/list', async (request: FastifyRequest, reply: FastifyReply) => {
         let body: { [language: string]: { info: string } } = {};
         for(const language of supportedLanguages) {
             body[language] = { info: info(language) };
         }
 
-        sendResponse(res, 200, { supportedLanguages: body, version: config.version });
+        sendResponse(reply, 200, { supportedLanguages: body, version: config.version });
     });
 
-    app.get('/status', (req: Request, res: Response) => {
-        sendResponse(res, 200, {
+    app.get('/status', (request: FastifyRequest, reply: FastifyReply) => {
+        sendResponse(reply, 200, {
             uptime: process.uptime(),
             version: config.version
         });
     });
 
-    const server = app.listen(port, '0.0.0.0', () => {
+    try {
+        await app.listen({port, host: '0.0.0.0'});
         console.log();
         if(config.version < 1) console.warn("Warning: This is an in development version of the API. Please report any issues you find.");
         console.log(`API running at http://localhost:${port}\n`);
-    });
+    } catch (err) {
+        console.error(err);
+        await cleanupContainerPool();
+        process.exit(1);
+    }
 
     async function gracefulShutdown(signal: string) {
         console.log(`\nReceived ${signal}, shutting down gracefully...`);
@@ -91,13 +93,8 @@ async function startUp() {
             process.exit(1);
         }, 30000);
         try {
-            await new Promise<void>((resolve, reject) => {
-                server.close(err => {
-                    if (err) return reject(err);
-                    console.log('HTTP server closed.');
-                    resolve();
-                });
-            });
+            await app.close();
+            console.log("Http server closed.");
             await cleanupContainerPool();
             console.log('Proceeding with exit...');
             clearTimeout(forceExitTimer);
