@@ -85,7 +85,6 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
 export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
     const timeout = 30;
 
-    if (code === "") throw { status: 400, error: "No Code found to execute." };
     if (!supportedLanguages.includes(language)) {
         throw {
             status: 400,
@@ -93,29 +92,65 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         };
     }
 
+    console.time(`job-TOTAL`); // PERF_LOG
+    console.time(`job-TOTAL-with-cleanup`); // PERF_LOG
+
+    console.time(`job-createCodeFile`); // PERF_LOG
     const { jobID, dirPath } = await createCodeFile(language, code);
+    console.timeEnd(`job-createCodeFile`); // PERF_LOG
+
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
     let startProcess: ChildProcess | undefined;
     let containerName = getContainer(language);
     
+    console.time(`job-${jobID}-containerSetup`); // PERF_LOG
     if(!containerName) {
         console.log(`No available container for language: ${language}. Starting a new container...`);
         containerName = `codexx-runner-${language}-${jobID}`;
         startProcess = await startContainer(containerName, dirPath, language);
     } else {
+        console.log(`Reusing container for language: ${language}`)
         const copyFileProccess = spawn(config.containerProvider, ['cp', `${dirPath}/.`, `${containerName}:/code/`]);
         await handleSpawn(copyFileProccess, (error) => new Error(`Failed to copy code file to container: ${error}`));
     }
+    console.timeEnd(`job-${jobID}-containerSetup`); // PERF_LOG
+
+    const cleanup = () => {
+        (async () => {
+            console.time(`job-${jobID}-cleanup`); // PERF_LOG
+            if (startProcess) {
+                try {
+                    await executeCleanupCommand(config.containerProvider, ['stop', '-t', '1', containerName!]);
+                    await executeCleanupCommand(config.containerProvider, ['rm', containerName!]);
+                } catch (error) {
+                    console.error(`Error during cleanup for jobID: ${jobID}`, error);
+                } finally {
+                    startProcess.kill('SIGKILL');
+                }
+            } else if (containerName) {
+                await returnContainer(language, containerName);
+            }
+            removeCodeFile(jobID);
+            console.log(`Cleaned up jobID: ${jobID}`);
+            console.timeEnd(`job-${jobID}-cleanup`); // PERF_LOG
+            console.timeEnd(`job-TOTAL-with-cleanup`); // PERF_LOG
+        })().catch(err => {
+            console.error(`Background cleanup failed for jobID ${jobID}:`, err);
+        });
+    };
 
     try {
         if (compileCodeCommand) {
+            console.time(`job-${jobID}-compile`); // PERF_LOG
             await compileInContainer(containerName, compileCodeCommand, compilationArgs);
+            console.timeEnd(`job-${jobID}-compile`); // PERF_LOG
         }
 
         let testResults: { output: string; passed: boolean }[] | undefined = undefined;
         let output: string | undefined = undefined;
         let error: string = "";
 
+        console.time(`job-${jobID}-execute`); // PERF_LOG
         if (tests && tests.length > 0) {
             testResults = [];
             for (let i = 0; i < tests.length; i++) {
@@ -136,23 +171,14 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             output = result.output;
             error = result.error;
         }
+        console.timeEnd(`job-${jobID}-execute`); // PERF_LOG
 
+        cleanup();
+        console.timeEnd(`job-TOTAL`); // PERF_LOG
         return { output, testResults, error, language, info: info(language) };
 
-    } finally {
-        if (startProcess) {
-            try {
-                await executeCleanupCommand(config.containerProvider, ['stop', containerName]);
-                await executeCleanupCommand(config.containerProvider, ['rm', containerName]);
-            } catch (error) {
-                console.error(`Error during cleanup for jobID: ${jobID}`, error);
-            } finally {
-                startProcess.kill('SIGKILL');
-            }
-        } else if (containerName) {
-            await returnContainer(language, containerName);
-        }
-        removeCodeFile(jobID);
-        console.log(`Cleaned up jobID: ${jobID}`);
+    } catch (err) {
+        cleanup();
+        throw err;
     }
 }
