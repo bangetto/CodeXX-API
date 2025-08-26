@@ -1,11 +1,13 @@
-import fastify, { FastifyRequest, FastifyReply } from "fastify";
+import fastify from "fastify";
 import cors from "@fastify/cors";
+import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { runCode } from "./run-code";
 import { supportedLanguages } from "./run-code/instructions";
 import info, { initInfo } from "./run-code/info";
 import config from "./utils/config";
 import { initializeContainerPool, cleanupContainerPool } from "./run-code/containerPoolManager";
 import { ensureContainerProviderReady } from "./utils/containerProviderManager";
+import * as schemas from "./utils/schemas";
 
 async function startUp() {
     try {
@@ -26,55 +28,85 @@ async function startUp() {
 (async () => {
     await startUp();
 
-    const app = fastify();
+    const app = fastify().withTypeProvider<TypeBoxTypeProvider>();
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
     app.register(cors);
 
-    const sendResponse = (reply: FastifyReply, statusCode: number, body: any) => {
-        const timeStamp = Date.now();
-
-        reply.status(statusCode).send({
-            ...body,
-            timeStamp,
-            status: statusCode,
-        });
-    };
+    
 
 
-    app.post("/", async (request: FastifyRequest, reply: FastifyReply) => {
-        console.log(`Received request with language: ${(request.body as any).language}`);
+    app.post("/",{
+        schema: {
+            body: schemas.RunCodeBodySchema,
+            response: {
+                200: schemas.SuccessResponseSchema,
+                400: schemas.ErrorResponseSchema,
+                500: schemas.ErrorResponseSchema,
+            },
+        }
+    }, async (request, reply) => {
         try {
-            const output = await runCode(request.body as any);
-            sendResponse(reply, 200, output);
+            const output = await runCode(request.body);
+            const responsePayload = {
+                ...output,
+                timeStamp: Date.now(),
+                status: 200
+            };
+            reply.status(200).send(responsePayload);
+
         } catch (err: unknown) {
             const status = (err as any)?.status ?? 500;
             const message = (err as any)?.message ?? 'Internal Server Error';
-            // log stack server-side:
             if (status != 500) console.error('runCode error:', err);
-            sendResponse(reply, status, { error: message });
+
+            const errorPayload = {
+                error: message,
+                timeStamp: Date.now(),
+                status: status
+            };
+            reply.status(status).send(errorPayload);
         }
     });
 
-    app.get('/list', async (request: FastifyRequest, reply: FastifyReply) => {
-        let body: { [language: string]: { info: string } } = {};
+    app.get('/list', {
+        schema: { response: {
+            200: schemas.ListResponseSchema,
+            500: schemas.ErrorResponseSchema,
+        }}
+    }, (request, reply) => {
+        let listBody: { [language: string]: { info: string } } = {};
         for(const language of supportedLanguages) {
-            body[language] = { info: info(language) };
+            listBody[language] = { info: info(language) };
         }
 
-        sendResponse(reply, 200, { supportedLanguages: body, version: config.version });
+        const payload = {
+            supportedLanguages: listBody,
+            version: config.version,
+            timeStamp: Date.now(),
+            status: 200
+        };
+
+        reply.status(200).send(payload);
     });
 
-    app.get('/status', (request: FastifyRequest, reply: FastifyReply) => {
-        sendResponse(reply, 200, {
+    app.get('/status', {
+        schema: { response: {
+            200: schemas.statusResponseSchema,
+            500: schemas.ErrorResponseSchema,
+        }}
+    }, (request, reply) => {
+        const payload = {
             uptime: process.uptime(),
-            version: config.version
-        });
+            version: config.version,
+            timeStamp: Date.now(),
+            status: 200
+        };
+        reply.status(200).send(payload);
     });
 
     try {
         await app.listen({port, host: '0.0.0.0'});
-        console.log();
         if(config.version < 1) console.warn("Warning: This is an in development version of the API. Please report any issues you find.");
         console.log(`API running at http://localhost:${port}\n`);
     } catch (err) {
