@@ -1,4 +1,3 @@
-
 import { Type, Static } from "@sinclair/typebox";
 
 // Define the schemas for request validation
@@ -49,3 +48,4 @@ export type RunCodeRequest = Static<typeof RunCodeBodySchema>;
 export type SuccessResponse = Static<typeof SuccessResponseSchema>;
 export type ErrorResponse = Static<typeof ErrorResponseSchema>;
 export type ListResponse = Static<typeof ListResponseSchema>;
+export type StatusResponse = Static<typeof statusResponseSchema>;

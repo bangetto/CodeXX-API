@@ -30,11 +30,7 @@ async function startUp() {
 
     const app = fastify().withTypeProvider<TypeBoxTypeProvider>();
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-
     app.register(cors);
-
-    
-
 
     app.post("/",{
         schema: {
