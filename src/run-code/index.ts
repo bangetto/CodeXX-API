@@ -27,9 +27,13 @@ interface RunCodeResult {
     info: string;
 }
 
-function executeCleanupCommand(command: string, args: string[]): Promise<void> {
+async function executeCleanupCommand(command: string, args: string[]): Promise<void> {
     const process = spawn(command, args);
-    return handleSpawn(process, (error, code) => new Error(`Command failed with code ${code}: ${command} ${args.join(' ')}\n${error}`));
+    const { code, stderr } = await handleSpawn(process);
+    if (code !== 0) {
+        console.error(`Cleanup command failed with code ${code}: ${command} ${args.join(' ')}
+${stderr}`);
+    }
 }
 
 async function startContainer(containerName: string, dirPath: string, language: string): Promise<ChildProcess> {
@@ -41,14 +45,21 @@ async function startContainer(containerName: string, dirPath: string, language: 
         'sleep', 'infinity'
     ];
     const startProcess = spawn(config.containerProvider, containerArgs);
-    await handleSpawn(startProcess, (error) => new Error(`Failed to start container: ${error}`));
+    const { code, stderr } = await handleSpawn(startProcess);
+    if (code !== 0) {
+        throw new Error(`Failed to start container: ${stderr}`);
+    }
     return startProcess;
 }
 
-async function compileInContainer(containerName: string, compileCommand: string, compilationArgs: string[] | undefined) {
+async function compileInContainer(containerName: string, compileCommand: string, compilationArgs: string[] | undefined): Promise<{ error: string | null }> {
     const compileArgs = ['exec', containerName, compileCommand, ...(compilationArgs || [])];
     const compileProcess = spawn(config.containerProvider, compileArgs);
-    await handleSpawn(compileProcess, (error) => ({ status: 200, output: '', error }));
+    const { code, stderr } = await handleSpawn(compileProcess);
+    if (code !== 0) {
+        return { error: stderr };
+    }
+    return { error: null };
 }
 
 function executeWithInputInContainer(containerName: string, executeCommand: string, executionArgs: string[] | undefined, inputStr: string, timeout: number): Promise<{ output: string; error: string }> {
@@ -111,7 +122,10 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     } else {
         console.log(`Reusing container for language: ${language}`)
         const copyFileProccess = spawn(config.containerProvider, ['cp', `${dirPath}/.`, `${containerName}:/code/`]);
-        await handleSpawn(copyFileProccess, (error) => new Error(`Failed to copy code file to container: ${error}`));
+        const { code, stderr } = await handleSpawn(copyFileProccess);
+        if (code !== 0) {
+            throw new Error(`Failed to copy code file to container: ${stderr}`);
+        }
     }
     console.timeEnd(`job-${jobID}-containerSetup`); // PERF_LOG
 
@@ -142,8 +156,14 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     try {
         if (compileCodeCommand) {
             console.time(`job-${jobID}-compile`); // PERF_LOG
-            await compileInContainer(containerName, compileCodeCommand, compilationArgs);
+            const compileResult = await compileInContainer(containerName, compileCodeCommand, compilationArgs);
             console.timeEnd(`job-${jobID}-compile`); // PERF_LOG
+            if (compileResult.error) {
+                cleanup();
+                console.timeEnd(`job-TOTAL`); // PERF_LOG
+                // Return compilation error to the user
+                return { error: compileResult.error, language, info: info(language) };
+            }
         }
 
         let testResults: { output: string; passed: boolean }[] | undefined = undefined;

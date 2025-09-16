@@ -10,7 +10,7 @@ async function startContainer(containerName: string, language: string, i: number
         'sleep', 'infinity'
     ];
     const container = spawn(config.containerProvider, containerArgs);
-    await handleSpawn(container, (error) => new Error(`Failed to start container: ${error}`));
+    await handleSpawn(container);
 }
 
 let containerPool: { [language: string]: string[] } = {};
@@ -55,7 +55,7 @@ export async function returnContainer(language: string, containerName: string): 
     }
     try {
         const cleanUpDirProcces = spawn(config.containerProvider, ['exec', containerName, 'sh', '-c', 'rm -rf /code/*']);
-        await handleSpawn(cleanUpDirProcces,(error) => new Error(`Failed to clean up container directory: ${error}`));
+        await handleSpawn(cleanUpDirProcces);
         containerPool[language].push(containerName);
         // console.log(`Returned container: ${containerName} to pool for language: ${language}`); // debug
     } catch (error) {

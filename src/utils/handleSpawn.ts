@@ -1,9 +1,13 @@
 import type { ChildProcess } from "child_process";
 
+export interface SpawnResult {
+    code: number | null;
+    stderr: string;
+}
+
 export default function handleSpawn(
     childProcess: ChildProcess,
-    rejectionValue: (stderr: string, code: number | null) => unknown
-): Promise<void> {
+): Promise<SpawnResult> {
     return new Promise((resolve, reject) => {
         let stderr = '';
         const onData = (chunk: Buffer) => {
@@ -18,18 +22,12 @@ export default function handleSpawn(
             }
         };
         childProcess.once('close', (code) => {
-            if (code === 0) {
-                cleanup();
-                resolve();
-            } else {
-                const rejection = rejectionValue(stderr, code);
-                cleanup();
-                reject(rejection instanceof Error ? rejection : new Error(String(rejection)));
-            }
+            cleanup();
+            resolve({ code, stderr });
         });
         childProcess.once('error', (err: Error) => {
             cleanup();
-            reject(err);
+            reject(err); // reject on fundamental spawn errors
         });
     });
 }
