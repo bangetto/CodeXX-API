@@ -54,8 +54,12 @@ export async function returnContainer(language: string, containerName: string): 
         containerPool[language] = [];
     }
     try {
+        const restartProcess = spawn(config.containerProvider, ['restart', containerName]);
+        await handleSpawn(restartProcess);
+
         const cleanUpDirProcces = spawn(config.containerProvider, ['exec', containerName, 'sh', '-c', 'rm -rf /code/*']);
         await handleSpawn(cleanUpDirProcces);
+
         containerPool[language].push(containerName);
         // console.log(`Returned container: ${containerName} to pool for language: ${language}`); // debug
     } catch (error) {

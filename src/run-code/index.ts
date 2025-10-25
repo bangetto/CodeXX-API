@@ -86,7 +86,7 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
         });
 
         if (inputStr) {
-                    executeProcess.stdin.write(inputStr + '\n');
+            executeProcess.stdin.write(inputStr + '\n');
         }
         executeProcess.stdin.end();
     });
@@ -103,12 +103,10 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         };
     }
 
-    console.time(`job-TOTAL`); // PERF_LOG
-    console.time(`job-TOTAL-with-cleanup`); // PERF_LOG
-
-    console.time(`job-createCodeFile`); // PERF_LOG
     const { jobID, dirPath } = await createCodeFile(language, code);
-    console.timeEnd(`job-createCodeFile`); // PERF_LOG
+
+    console.time(`job-${jobID}-TOTAL`); // PERF_LOG
+    console.time(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
 
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
     let startProcess: ChildProcess | undefined;
@@ -147,7 +145,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             removeCodeFile(jobID);
             console.log(`Cleaned up jobID: ${jobID}`);
             console.timeEnd(`job-${jobID}-cleanup`); // PERF_LOG
-            console.timeEnd(`job-TOTAL-with-cleanup`); // PERF_LOG
+            console.timeEnd(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
         })().catch(err => {
             console.error(`Background cleanup failed for jobID ${jobID}:`, err);
         });
@@ -160,7 +158,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             console.timeEnd(`job-${jobID}-compile`); // PERF_LOG
             if (compileResult.error) {
                 cleanup();
-                console.timeEnd(`job-TOTAL`); // PERF_LOG
+                console.timeEnd(`job-${jobID}-TOTAL`); // PERF_LOG
                 // Return compilation error to the user
                 return { error: compileResult.error, language, info: info(language) };
             }
