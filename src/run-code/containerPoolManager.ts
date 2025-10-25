@@ -14,6 +14,15 @@ async function startContainer(containerName: string, language: string, i: number
 }
 
 let containerPool: { [language: string]: string[] } = {};
+let managedContainers: Set<string> = new Set();
+
+export function addManagedContainer(containerName: string) {
+    managedContainers.add(containerName);
+}
+
+export function removeManagedContainer(containerName: string) {
+    managedContainers.delete(containerName);
+}
 
 export async function initializeContainerPool() {
     console.log(`Initializing container pool with provider: ${config.containerProvider}`);
@@ -28,6 +37,7 @@ export async function initializeContainerPool() {
                     try {
                         await startContainer(containerName, language, i);
                         containerPool[language].push(containerName);
+                        managedContainers.add(containerName);
                     } catch (err) {
                         console.error(`Failed to prewarm container ${containerName}:`, err);
                     }
@@ -73,39 +83,42 @@ export async function cleanupContainerPool(): Promise<void> {
         return;
     }
     cleaningUp = true;
-    console.log("Starting container pool cleanup. Preparing to remove all prewarmed containers...");
+    console.log("Starting container pool cleanup. Preparing to remove all containers...");
     const cleanupPromises: Promise<void>[] = [];
 
-    for (const language in containerPool) {
-        for (const containerName of containerPool[language]) {
-            const promise = new Promise<void>((resolve) => {
-                const cleanupArgs = ['rm', '-f', containerName];
-                const cleanupProcess = spawn(config.containerProvider, cleanupArgs);
+    for (const containerName of managedContainers) {
+        const promise = new Promise<void>((resolve) => {
+            const cleanupArgs = ['rm', '-f', containerName];
+            const cleanupProcess = spawn(config.containerProvider, cleanupArgs);
 
-                let errorOutput = '';
-                cleanupProcess.stderr.on('data', (data) => {
-                    errorOutput += data.toString();
-                });
+            let errorOutput = '';
+            cleanupProcess.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+            });
 
-                cleanupProcess.on('close', (code) => {
-                    if (code !== 0) {
+            cleanupProcess.on('close', (code) => {
+                if (code !== 0) {
+                    // Suppress "No such container" errors, as it might have been an on-demand one already cleaned up
+                    if (!errorOutput.includes('No such container')) {
                         console.error(`Failed to clean up container ${containerName} (exit code: ${code}): ${errorOutput}`);
                     }
-                    // Always resolve to ensure Promise.all doesn't fail fast.
-                    resolve();
-                });
-
-                cleanupProcess.on('error', (err) => {
-                    console.error(`Error spawning cleanup process for ${containerName}:`, err);
-                    // Always resolve.
-                    resolve();
-                });
+                }
+                // Always resolve to ensure Promise.all doesn't fail fast.
+                resolve();
             });
-            cleanupPromises.push(promise);
-        }
+
+            cleanupProcess.on('error', (err) => {
+                console.error(`Error spawning cleanup process for ${containerName}:`, err);
+                // Always resolve.
+                resolve();
+            });
+        });
+        cleanupPromises.push(promise);
     }
+    
     console.log(`Initiating removal of ${cleanupPromises.length} containers...`);
     await Promise.all(cleanupPromises);
     containerPool = {};
+    managedContainers.clear();
     console.log("Container pool cleaned up.");
 }

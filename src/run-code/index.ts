@@ -4,7 +4,7 @@ import { removeCodeFile } from "../file-system/removeCodeFile";
 import info from "./info";
 import { spawn, ChildProcess } from "child_process";
 import config from "../utils/config";
-import { getContainer, returnContainer } from "./containerPoolManager";
+import { getContainer, returnContainer, addManagedContainer, removeManagedContainer } from "./containerPoolManager";
 import handleSpawn from "../utils/handleSpawn";
 
 interface TestingVal {
@@ -49,6 +49,7 @@ async function startContainer(containerName: string, dirPath: string, language: 
     if (code !== 0) {
         throw new Error(`Failed to start container: ${stderr}`);
     }
+    addManagedContainer(containerName);
     return startProcess;
 }
 
@@ -127,13 +128,14 @@ export async function runCode({ language = "", code = "", input = "", tests = []
     }
     console.timeEnd(`job-${jobID}-containerSetup`); // PERF_LOG
 
-    const cleanup = () => {
-        (async () => {
+    async function cleanup() {
+        try {
             console.time(`job-${jobID}-cleanup`); // PERF_LOG
             if (startProcess) {
                 try {
                     await executeCleanupCommand(config.containerProvider, ['stop', '-t', '1', containerName!]);
                     await executeCleanupCommand(config.containerProvider, ['rm', containerName!]);
+                    removeManagedContainer(containerName!);
                 } catch (error) {
                     console.error(`Error during cleanup for jobID: ${jobID}`, error);
                 } finally {
@@ -146,9 +148,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
             console.log(`Cleaned up jobID: ${jobID}`);
             console.timeEnd(`job-${jobID}-cleanup`); // PERF_LOG
             console.timeEnd(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
-        })().catch(err => {
+        } catch(err) {
             console.error(`Background cleanup failed for jobID ${jobID}:`, err);
-        });
+        };
     };
 
     try {
