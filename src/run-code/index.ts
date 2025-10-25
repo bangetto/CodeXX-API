@@ -39,8 +39,6 @@ ${stderr}`);
 async function startContainer(containerName: string, dirPath: string, language: string): Promise<ChildProcess> {
     const containerArgs = [
         'run', '-d', '--name', containerName,
-        '-v', `${dirPath}:/code`,
-        '--user', `${1000}:${1000}`,
         '--network=none', `${language}-compile-run`,
         'sleep', 'infinity'
     ];
@@ -194,7 +192,7 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         console.timeEnd(`job-${jobID}-execute`); // PERF_LOG
 
         cleanup();
-        console.timeEnd(`job-TOTAL`); // PERF_LOG
+        console.timeEnd(`job-${jobID}-TOTAL`); // PERF_LOG
         return { output, testResults, error, language, info: info(language) };
 
     } catch (err) {
