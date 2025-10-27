@@ -39,6 +39,7 @@ ${stderr}`);
 async function startContainer(containerName: string, dirPath: string, language: string): Promise<ChildProcess> {
     const containerArgs = [
         'run', '-d', '--name', containerName,
+        '-v', `${dirPath}:/code`,
         '--network=none', `${language}-compile-run`,
         'sleep', 'infinity'
     ];
