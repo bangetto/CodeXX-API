@@ -8,7 +8,11 @@ export const RunCodeBodySchema = Type.Object({
     tests: Type.Optional(Type.Array(Type.Object({
         input: Type.String(),
         output: Type.Optional(Type.String())
-    })))
+    }))),
+    mode: Type.Optional(Type.Union([
+        Type.Literal('runAll'),
+        Type.Literal('failFast')
+    ]))
 });
 
 const BaseResponseSchema = Type.Object({
@@ -28,6 +32,11 @@ const SuccessDataSchema = Type.Object({
 const ErrorDataSchema = Type.Object({
     error: Type.String(),
 });
+const RunCodeErrorDataSchema = Type.Object({
+    error: Type.String(),
+    language: Type.String(),
+    info: Type.String(),
+});
 const listDataSchema = Type.Object({
     supportedLanguages: Type.Record(
         Type.String(), Type.Object({
@@ -41,11 +50,15 @@ const statusDataSchema = Type.Object({
 });
 export const SuccessResponseSchema = Type.Intersect([SuccessDataSchema,BaseResponseSchema]);
 export const ErrorResponseSchema = Type.Intersect([ErrorDataSchema, BaseResponseSchema]); 
+export const RunCodeErrorResponseSchema = Type.Intersect([RunCodeErrorDataSchema, BaseResponseSchema]);
 export const ListResponseSchema = Type.Intersect([listDataSchema, BaseResponseSchema]);
 export const statusResponseSchema = Type.Intersect([statusDataSchema, BaseResponseSchema]);
+
+export type RunCodeError = Static<typeof RunCodeErrorDataSchema>;
 
 export type RunCodeRequest = Static<typeof RunCodeBodySchema>;
 export type SuccessResponse = Static<typeof SuccessResponseSchema>;
 export type ErrorResponse = Static<typeof ErrorResponseSchema>;
+export type RunCodeErrorResponse = Static<typeof RunCodeErrorResponseSchema>;
 export type ListResponse = Static<typeof ListResponseSchema>;
 export type StatusResponse = Static<typeof statusResponseSchema>;

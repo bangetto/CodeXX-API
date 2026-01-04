@@ -6,33 +6,14 @@ import { spawn, ChildProcess } from "child_process";
 import config from "../utils/config";
 import { getContainer, returnContainer, addManagedContainer, removeManagedContainer } from "./containerPoolManager";
 import handleSpawn from "../utils/handleSpawn";
+import { RunCodeError, RunCodeRequest, SuccessResponse } from "../utils/schemas";
 
-interface TestingVal {
-    input: string;
-    output?: string;
-}
-
-interface RunCodeParams {
-    language?: string;
-    code?: string;
-    input?: string;
-    tests?: TestingVal[];
-}
-
-interface RunCodeResult {
-    output?: string;
-    testResults?: { output: string; passed: boolean }[];
-    error: string;
-    language: string;
-    info: string;
-}
 
 async function executeCleanupCommand(command: string, args: string[]): Promise<void> {
     const process = spawn(command, args);
     const { code, stderr } = await handleSpawn(process);
     if (code !== 0) {
-        console.error(`Cleanup command failed with code ${code}: ${command} ${args.join(' ')}
-${stderr}`);
+        console.error(`Cleanup command failed with code ${code}: ${command} ${args.join(' ')}\n${stderr}`);
     }
 }
 
@@ -62,7 +43,7 @@ async function compileInContainer(containerName: string, compileCommand: string,
     return { error: null };
 }
 
-function executeWithInputInContainer(containerName: string, executeCommand: string, executionArgs: string[] | undefined, inputStr: string, timeout: number): Promise<{ output: string; error: string }> {
+function executeWithInputInContainer(containerName: string, executeCommand: string, executionArgs: string[] | undefined, inputStr: string|undefined, timeout: number): Promise<{ output: string; error: string }> {
     return new Promise((resolve, reject) => {
         const execArgs = ['exec', '-i', containerName, executeCommand, ...(executionArgs || [])];
         const executeProcess = spawn(config.containerProvider, execArgs);
@@ -93,7 +74,7 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
 }
 
 
-export async function runCode({ language = "", code = "", input = "", tests = [] }: RunCodeParams): Promise<RunCodeResult> {
+export async function runCode({ language, code, input, tests = [], mode = "runAll" }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
     const timeout = 30;
 
     if (!supportedLanguages.includes(language)) {
@@ -119,8 +100,8 @@ export async function runCode({ language = "", code = "", input = "", tests = []
         startProcess = await startContainer(containerName, dirPath, language);
     } else {
         console.log(`Reusing container for language: ${language}`)
-        const copyFileProccess = spawn(config.containerProvider, ['cp', `${dirPath}/.`, `${containerName}:/code/`]);
-        const { code, stderr } = await handleSpawn(copyFileProccess);
+        const copyFileProcess = spawn(config.containerProvider, ['cp', `${dirPath}/.`, `${containerName}:/code/`]);
+        const { code, stderr } = await handleSpawn(copyFileProcess);
         if (code !== 0) {
             throw new Error(`Failed to copy code file to container: ${stderr}`);
         }
@@ -182,6 +163,9 @@ export async function runCode({ language = "", code = "", input = "", tests = []
                     testResults[i] = { output: result.output.replace(/\r\n|\r/g, '\n'), passed: true };
                     if (test.output) {
                         testResults[i].passed = testResults[i].output === test.output.replace(/\r\n|\r/g, '\n');
+                    }
+                    if (mode === 'failFast' && !testResults[i].passed) {
+                        break;
                     }
                 }
             }
