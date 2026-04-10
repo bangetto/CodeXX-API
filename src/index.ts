@@ -15,8 +15,8 @@ async function startUp() {
         await ensureContainerProviderReady();
         await initializeContainerPool();
         await initInfo();
-    } catch (error: any) {
-        console.error(`Fatal startup error: ${error.message}`);
+    } catch (error) {
+        console.error(`Fatal startup error: ${(error as Error).message || error}`);
         console.info("\nEnsure that you configured everything correctly, if you are unsure, please visit the wiki: https://github.com/bangetto/CodeXX-API/wiki");
         console.info("If you are still having issues, please open an issue on GitHub: https://github.com/bangetto/CodeXX-API/issues");
         console.error("\nCleaning up container pool before exiting...");
@@ -32,7 +32,7 @@ async function startUp() {
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
     app.register(cors);
 
-    app.addHook('preSerialization', async (request, reply, payload: any) => {
+    app.addHook('preSerialization', async (request, reply, payload: Record<string, unknown>) => {
         return {
             ...payload,
             timeStamp: Date.now(),
@@ -40,7 +40,13 @@ async function startUp() {
         };
     });
 
-    app.setErrorHandler((error: any, request, reply) => {
+    interface FastifyError extends Error {
+    statusCode?: number;
+    status?: number;
+    error?: string;
+}
+
+app.setErrorHandler((error: FastifyError, request, reply) => {
         const statusCode = error.statusCode ?? error.status ?? 500;
         if (400 <= statusCode && statusCode < 500) {
             // Client error
