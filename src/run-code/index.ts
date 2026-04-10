@@ -70,15 +70,20 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
     
     console.time(`job-${jobID}-containerSetup`); // PERF_LOG
     let isPooledContainer = false;
-    if(!containerName) {
-        console.log(`No available container for language: ${language}. Starting a new container...`);
-        containerName = `codexx-runner-${language}-${jobID}`;
-        await startContainer({ containerName, dirPath, language });
-        addManagedContainer(containerName);
-    } else {
-        console.log(`Reusing container for language: ${language}`)
-        isPooledContainer = true;
-        await copyToContainer(containerName, dirPath);
+    try {
+        if(!containerName) {
+            console.log(`No available container for language: ${language}. Starting a new container...`);
+            containerName = `codexx-runner-${language}-${jobID}`;
+            await startContainer({ containerName, dirPath, language });
+            addManagedContainer(containerName);
+        } else {
+            console.log(`Reusing container for language: ${language}`)
+            isPooledContainer = true;
+            await copyToContainer(containerName, dirPath);
+        }
+    } catch (error) {
+        removeCodeFile(jobID);
+        throw error;
     }
     console.timeEnd(`job-${jobID}-containerSetup`); // PERF_LOG
 
