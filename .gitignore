@@ -6,7 +6,7 @@ tmp/
 *.bat
 *.zip
 *.md
-src/dev/
+tsconfig.tsbuildinfo
 
 !/README.md
 !/CHANGELOG.md

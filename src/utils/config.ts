@@ -7,6 +7,12 @@ export interface Instruction {
     executeCodeCommand: string;
     executionArgs?: string[];
     compilerInfoCommand: string;
+    image?: string;
+}
+
+export interface SecurityConfig {
+    uid: number;
+    gid: number;
 }
 
 export interface Config {
@@ -16,6 +22,7 @@ export interface Config {
     };
     containerProvider: string;
     containerProviderStartupCommand?: string;
+    security?: SecurityConfig;
 }
 
 const config: Config = configData;

@@ -1,16 +1,10 @@
 import config from "../utils/config";
 import { spawn } from "child_process";
 import handleSpawn from "../utils/handleSpawn";
+import { startContainer } from "./containerStarter";
 
-async function startContainer(containerName: string, language: string, i: number): Promise<void> {
-    const containerArgs = [
-        'run', '-d', '--name', containerName,
-        '--network=none',
-        `${language}-compile-run`,
-        'sleep', 'infinity'
-    ];
-    const container = spawn(config.containerProvider, containerArgs);
-    await handleSpawn(container);
+async function startPoolContainer(containerName: string, language: string): Promise<void> {
+    await startContainer({ containerName, language });
 }
 
 let containerPool: { [language: string]: string[] } = {};
@@ -35,7 +29,7 @@ export async function initializeContainerPool() {
                 const startPromise = new Promise<void>(async (resolve) => {
                     const containerName = `codexx-prewarm-${language}-${i}`;
                     try {
-                        await startContainer(containerName, language, i);
+                        await startPoolContainer(containerName, language);
                         containerPool[language].push(containerName);
                         managedContainers.add(containerName);
                     } catch (err) {

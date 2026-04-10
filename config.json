@@ -1,8 +1,13 @@
 {
     "version": 0.2,
+    "security": {
+        "uid": 1000,
+        "gid": 1000
+    },
     "instructions": {
         "cpp": {
             "preWarmCount": 3,
+            "image": "codexx-cpp:latest",
             "compileCodeCommand": "g++",
             "compilationArgs": [
                 "main.cpp",
