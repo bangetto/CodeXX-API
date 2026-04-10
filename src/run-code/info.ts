@@ -24,7 +24,7 @@ async function getCompilerInfoFromNewContainer(language: string): Promise<string
 }
 
 async function getLanguageInfo(language: string): Promise<[string, string]> {
-    const container = getContainer(language);
+    const container = await getContainer(language);
     try {
         let result: string;
         if (!container) {

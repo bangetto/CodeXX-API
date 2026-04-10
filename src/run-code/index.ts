@@ -66,7 +66,7 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
     console.time(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
 
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
-    let containerName = getContainer(language);
+    let containerName = await getContainer(language);
     
     console.time(`job-${jobID}-containerSetup`); // PERF_LOG
     let isPooledContainer = false;

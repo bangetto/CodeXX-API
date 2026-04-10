@@ -2,6 +2,7 @@ import config from "../utils/config";
 import { spawn } from "child_process";
 import handleSpawn from "../utils/handleSpawn";
 import { startContainer } from "./containerStarter";
+import { Mutex } from "async-mutex";
 
 async function startPoolContainer(containerName: string, language: string): Promise<void> {
     await startContainer({ containerName, language });
@@ -9,6 +10,16 @@ async function startPoolContainer(containerName: string, language: string): Prom
 
 let containerPool: { [language: string]: string[] } = {};
 let managedContainers: Set<string> = new Set();
+const languageLocks: Map<string, Mutex> = new Map();
+
+function getLanguageLock(language: string): Mutex {
+    let lock = languageLocks.get(language);
+    if (!lock) {
+        lock = new Mutex();
+        languageLocks.set(language, lock);
+    }
+    return lock;
+}
 
 export function addManagedContainer(containerName: string) {
     managedContainers.add(containerName);
@@ -45,18 +56,22 @@ export async function initializeContainerPool() {
     console.log("Container pool initialized.");
 }
 
-export function getContainer(language: string): string | null {
-    if (!containerPool[language] || containerPool[language].length === 0) {
-        return null;
-    }
-    const containerName = containerPool[language].pop();
-    return containerName || null;
+export async function getContainer(language: string): Promise<string | null> {
+    const lock = getLanguageLock(language);
+    return lock.runExclusive(() => {
+        if (!containerPool[language] || containerPool[language].length === 0) {
+            return null;
+        }
+        const containerName = containerPool[language].pop();
+        return containerName || null;
+    });
 }
 
 export async function returnContainer(language: string, containerName: string): Promise<void> {
     if (!containerPool[language]) {
         containerPool[language] = [];
     }
+    const lock = getLanguageLock(language);
     try {
         const restartProcess = spawn(config.containerProvider, ['restart', containerName]);
         await handleSpawn(restartProcess);
@@ -64,8 +79,9 @@ export async function returnContainer(language: string, containerName: string): 
         const cleanUpDirProcces = spawn(config.containerProvider, ['exec', containerName, 'sh', '-c', 'rm -rf /code/*']);
         await handleSpawn(cleanUpDirProcces);
 
-        containerPool[language].push(containerName);
-        // console.log(`Returned container: ${containerName} to pool for language: ${language}`); // debug
+        await lock.runExclusive(() => {
+            containerPool[language].push(containerName);
+        });
     } catch (error) {
         console.error(`Failed to return container ${containerName} to pool for language ${language}:`, error);
     }
