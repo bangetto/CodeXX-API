@@ -8,6 +8,7 @@ import { getContainer, returnContainer, addManagedContainer, removeManagedContai
 import handleSpawn from "../utils/handleSpawn";
 import { RunCodeError, RunCodeRequest, SuccessResponse } from "../utils/schemas";
 import { startContainer, copyToContainer, cleanupContainer } from "./containerStarter";
+import { perfStart, perfEnd, flushPerfLogs } from "../utils/perfLogger";
 
 async function compileInContainer(containerName: string, compileCommand: string, compilationArgs: string[] | undefined): Promise<{ error: string | null }> {
     const compileArgs = ['exec', containerName, compileCommand, ...(compilationArgs || [])];
@@ -42,6 +43,11 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
             resolve({ output, error: execError });
         });
 
+        executeProcess.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+        });
+
         if (inputStr) {
             const canContinue = executeProcess.stdin.write(inputStr + '\n');
             if (!canContinue) {
@@ -65,13 +71,13 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
 
     const { jobID, dirPath } = await createCodeFile(language, code);
 
-    console.time(`job-${jobID}-TOTAL`); // PERF_LOG
-    console.time(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
+    perfStart(`job-${jobID}-TOTAL`); // PERF_LOG
+    perfStart(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
 
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
     let containerName = await getContainer(language);
     
-    console.time(`job-${jobID}-containerSetup`); // PERF_LOG
+    perfStart(`job-${jobID}-containerSetup`); // PERF_LOG
     let isPooledContainer = false;
     try {
         if(!containerName) {
@@ -88,11 +94,11 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
         removeCodeFile(jobID);
         throw error;
     }
-    console.timeEnd(`job-${jobID}-containerSetup`); // PERF_LOG
+    perfEnd(`job-${jobID}-containerSetup`); // PERF_LOG
 
     async function cleanup() {
         try {
-            console.time(`job-${jobID}-cleanup`); // PERF_LOG
+            perfStart(`job-${jobID}-cleanup`); // PERF_LOG
             if (containerName) {
                 try {
                     if (isPooledContainer) {
@@ -107,8 +113,9 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
             }
             removeCodeFile(jobID);
             console.log(`Cleaned up jobID: ${jobID}`);
-            console.timeEnd(`job-${jobID}-cleanup`); // PERF_LOG
-            console.timeEnd(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
+            perfEnd(`job-${jobID}-cleanup`); // PERF_LOG
+            perfEnd(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
+            console.log(flushPerfLogs(jobID));
         } catch(err) {
             console.error(`Background cleanup failed for jobID ${jobID}:`, err);
         };
@@ -116,12 +123,13 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
 
     try {
         if (compileCodeCommand) {
-            console.time(`job-${jobID}-compile`); // PERF_LOG
+            perfStart(`job-${jobID}-compile`); // PERF_LOG
             const compileResult = await compileInContainer(containerName, compileCodeCommand, compilationArgs);
-            console.timeEnd(`job-${jobID}-compile`); // PERF_LOG
+            perfEnd(`job-${jobID}-compile`); // PERF_LOG
             if (compileResult.error) {
                 cleanup();
-                console.timeEnd(`job-${jobID}-TOTAL`); // PERF_LOG
+                perfEnd(`job-${jobID}-TOTAL`); // PERF_LOG
+                console.log(flushPerfLogs(jobID));
                 // Return compilation error to the user
                 return { error: compileResult.error, language, info: info(language) };
             }
@@ -131,7 +139,7 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
         let output: string | undefined = undefined;
         let error: string = "";
 
-        console.time(`job-${jobID}-execute`); // PERF_LOG
+        perfStart(`job-${jobID}-execute`); // PERF_LOG
         if (tests && tests.length > 0) {
             testResults = [];
             for (let i = 0; i < tests.length; i++) {
@@ -155,10 +163,11 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
             output = result.output;
             error = result.error;
         }
-        console.timeEnd(`job-${jobID}-execute`); // PERF_LOG
+        perfEnd(`job-${jobID}-execute`); // PERF_LOG
 
         cleanup();
-        console.timeEnd(`job-${jobID}-TOTAL`); // PERF_LOG
+        perfEnd(`job-${jobID}-TOTAL`); // PERF_LOG
+        console.log(flushPerfLogs(jobID));
         return { output, testResults, error, language, info: info(language) };
 
     } catch (err) {
