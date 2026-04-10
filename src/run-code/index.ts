@@ -20,7 +20,7 @@ async function compileInContainer(containerName: string, compileCommand: string,
 }
 
 function executeWithInputInContainer(containerName: string, executeCommand: string, executionArgs: string[] | undefined, inputStr: string|undefined, timeout: number): Promise<{ output: string; error: string }> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         const execArgs = ['exec', '-i', containerName, executeCommand, ...(executionArgs || [])];
         const executeProcess = spawn(config.containerProvider, execArgs);
         let output = '';
@@ -43,7 +43,10 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
         });
 
         if (inputStr) {
-            executeProcess.stdin.write(inputStr + '\n');
+            const canContinue = executeProcess.stdin.write(inputStr + '\n');
+            if (!canContinue) {
+                await new Promise(resolve => executeProcess.stdin.once('drain', resolve));
+            }
         }
         executeProcess.stdin.end();
     });
