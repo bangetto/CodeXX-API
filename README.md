@@ -18,120 +18,151 @@ This endpoint allows you to execute your script and fetch output results.
 
 | Parameter  | Description                                                                                                                   |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| "code"     | Should contain the script that needs to be executed                                                                           |
-| "language" | Language that the script is written in for example: java, cpp, etc. (Check language as a payload down below in next question) |
-| "input"    | In case the script requires any kind of input for execution, leave empty if no input required                                 |
+| "code"     | The source code to execute (required)                                                                                          |
+| "language" | Language identifier (e.g., "cpp") (required)                                                                                  |
+| "input"    | Optional stdin input for the program                                                                                          |
+| "tests"    | Optional array of test cases to run: `{input: string, output?: string}`                                                       |
+| "mode"     | Test execution mode: `"runAll"` runs all tests, `"failFast"` stops on first failure (optional)                              |
 
 ### What are the languages that are supported for execution?
 
-Whichever language you might mention in the language field, it would be automatically executed with the latest version of it's compiler.
+Currently only C++ is supported out of the box. However, the system is designed to be extensible - users can easily add their own languages by setting up a Docker image and updating `config.json`.
+
 <details>
-<summary>Deprecated language support</summary>
+<summary>Adding new languages</summary>
 
-  | Languages | Language as a payload |
-  |-----------|-----------------------|
-  | Java | java |
-  | Python | py |
-  | C++ | cpp |
-  | C | c |
-  | GoLang | go |
-  | C# | cs |
-  | NodeJS | js |
+To add a new language:
 
-  More coming very soon!
+1. Create a Dockerfile based on the existing images
+2. Add the language configuration to `config.json`
+3. Build the image with `npm run build:images`
 
-</details><br>
-
->Currently only C++ is supported, but dynamic language support is planned!
+</details>
 
 ### NodeJS Example to Execute API Call?
 
 ```js
-var axios = require('axios');
-var qs = require('qs');
-var data = qs.stringify({
-    'code': 'val = int(input("Enter your value: ")) + 5\nprint(val)',
-    'language': 'py',
-    'input': '7'
-});
-var config = {
-    method: 'post',
-    url: 'https://api.codex.jaagrav.in',
-    headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    data : data
-};
-
-axios(config)
-  .then(function (response) {
-    console.log(JSON.stringify(response.data));
+const response = await fetch('http://localhost:3000', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    code: '#include <iostream>\nusing namespace std;\nint main() { int val; cin >> val; cout << val + 5 << endl; return 0; }',
+    language: 'cpp',
+    input: '12'
   })
-  .catch(function (error) {
-    console.log(error);
-  });
+});
+
+const result = await response.json();
+console.log(result);
+// { timeStamp: ..., status: 200, output: "17\n", error: "", language: "cpp", info: "g++ ..." }
 ```
 
 ### Sample Output
 
-The output is a JSON object comprising only one parameter that is the output.
+The output is a JSON object with the result and metadata.
 
 ```json
 {
   "timeStamp": 1672439982964,
   "status": 200,
-  "output": "Enter your value: 12\n",
+  "output": "17\n",
   "error": "",
-  "language": "py",
-  "info": "Python 3.6.9\n"
+  "language": "cpp",
+  "info": "g++ (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0"
 }
 ```
 
-> Since a lot of people had issues with executing the previous API from backend or serverless function, unlike the previous version of the API, this version of the API won't throw any Cross Origin errors so you can use this from the front end without any worries. Thank me later ;)
+### Running Tests
+
+You can run multiple test cases with the `tests` and `mode` parameters:
+
+```js
+const response = await fetch('http://localhost:3000', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    code: '#include <iostream>\nusing namespace std;\nint main() { int a, b; cin >> a >> b; cout << a + b << endl; return 0; }',
+    language: 'cpp',
+    tests: [
+      { input: '1 2', output: '3' },
+      { input: '5 10', output: '15' }
+    ],
+    mode: 'failFast'
+  })
+});
+
+const result = await response.json();
+console.log(result.testResults);
+// [{ output: "3\n", passed: true }, { output: "15\n", passed: true }]
+```
+
+
 
 #### `GET` /list
 
-This endpoint allows you to list all languages supported and their versions.
+This endpoint lists all supported languages and their versions.
 
 ```json
 {
   "timeStamp": 1672440064864,
   "status": 200,
-  "supportedLanguages": [
-    {
-      "language": "java",
-      "info": "openjdk 11.0.17 2022-10-18\nOpenJDK Runtime Environment (build 11.0.17+8-post-Ubuntu-1ubuntu218.04)\nOpenJDK 64-Bit Server VM (build 11.0.17+8-post-Ubuntu-1ubuntu218.04, mixed mode, sharing)\n"
-    },
-    {
-      "language": "cpp",
-      "info": "g++ (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0\nCopyright (C) 2017 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
-    },
-    {
-      "language": "py",
-      "info": "Python 3.6.9\n"
-    },
-    {
-      "language": "c",
-      "info": "gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0\nCopyright (C) 2017 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
-    },
-    {
-      "language": "js",
-      "info": "v16.13.2\n"
-    },
-    {
-      "language": "go",
-      "info": "go version go1.10.4 linux/amd64\n"
-    },
-    {
-      "language": "cs",
-      "info": "Mono C# compiler version 4.6.2.0\n"
+  "supportedLanguages": {
+    "cpp": {
+      "info": "g++ (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0\nCopyright (C) 2017 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"
     }
-  ]
+  },
+  "version": 1
+}
+```
+
+#### `GET` /status
+
+This endpoint returns server uptime and version information.
+
+```json
+{
+  "timeStamp": 1672440064864,
+  "status": 200,
+  "uptime": 3600,
+  "version": 1
 }
 ```
 
 > ~~This API is deployed on a free instance on [choreo](https://choreo.dev/) so shoutout to @wso2 for providing a platform that helped bringing back the CodeX API after a long down time. Since I am using a free tier, the API might be slow sometimes, so please be patient while I try to fund this project.~~
 
-> This API is not deployed publicly, it is necessery to self-host it
+> This API is not deployed publicly, it is necessary to self-host it
+
+### Getting Started
+
+#### Prerequisites
+
+- Node.js
+- Docker or Podman
+
+#### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Build TypeScript and Docker images
+npm run build
+
+# Or run separately:
+npm run build:ts      # Compile TypeScript
+npm run build:images # Build Docker/Podman images
+```
+
+#### Running
+
+```bash
+# Development mode (TypeScript)
+npm run dev
+
+# Production mode (compiled)
+npm run start
+```
+
+The server runs on port 3000 by default (configurable via `PORT` environment variable).
 
 Happy hacking!
