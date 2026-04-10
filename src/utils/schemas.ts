@@ -16,8 +16,8 @@ export const RunCodeBodySchema = Type.Object({
 });
 
 const BaseResponseSchema = Type.Object({
-    timeStamp: Type.Number(),
-    status: Type.Number(),
+    timeStamp: Type.Optional(Type.Number()),
+    status: Type.Optional(Type.Number()),
 });
 const SuccessDataSchema = Type.Object({
     output: Type.Optional(Type.String()),

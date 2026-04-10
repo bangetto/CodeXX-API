@@ -32,6 +32,28 @@ async function startUp() {
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
     app.register(cors);
 
+    app.addHook('preSerialization', async (request, reply, payload: any) => {
+        return {
+            ...payload,
+            timeStamp: Date.now(),
+            status: reply.statusCode
+        };
+    });
+
+    app.setErrorHandler((error: any, request, reply) => {
+        const statusCode = error.statusCode ?? error.status ?? 500;
+        if (400 <= statusCode && statusCode < 500) {
+            // Client error
+            reply.status(statusCode).send({
+                error: error.message || error.error || error.toString() || "Client error"
+            });
+        } else {
+            // Server error
+            console.error("Unhandled error:", error);
+            reply.status(500).send({ error: "Internal server error" });
+        }
+    });
+
     app.post("/",{
         schema: {
             body: schemas.RunCodeBodySchema,
@@ -42,27 +64,8 @@ async function startUp() {
             },
         }
     }, async (request, reply) => {
-        try {
-            const output = await runCode(request.body);
-            const responsePayload = {
-                ...output,
-                timeStamp: Date.now(),
-                status: 200
-            };
-            reply.status(200).send(responsePayload);
-
-        } catch (err: unknown) {
-            const status = (err as any)?.status ?? 500;
-            const message = (err as any)?.message ?? 'Internal Server Error';
-            if (status != 500) console.error('runCode error:', err);
-
-            const errorPayload = {
-                error: message,
-                timeStamp: Date.now(),
-                status: status
-            };
-            reply.status(status).send(errorPayload);
-        }
+        const output = await runCode(request.body);
+        return output;
     });
 
     app.get('/list', {
@@ -76,14 +79,10 @@ async function startUp() {
             listBody[language] = { info: info(language) };
         }
 
-        const payload = {
+        return {
             supportedLanguages: listBody,
             version: config.version,
-            timeStamp: Date.now(),
-            status: 200
         };
-
-        reply.status(200).send(payload);
     });
 
     app.get('/status', {
@@ -92,13 +91,10 @@ async function startUp() {
             500: schemas.ErrorResponseSchema,
         }}
     }, (request, reply) => {
-        const payload = {
+        return {
             uptime: process.uptime(),
             version: config.version,
-            timeStamp: Date.now(),
-            status: 200
         };
-        reply.status(200).send(payload);
     });
 
     try {
