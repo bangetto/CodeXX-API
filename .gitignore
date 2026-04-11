@@ -7,6 +7,7 @@ tmp/
 *.zip
 *.md
 tsconfig.tsbuildinfo
+.directory
 
 !/README.md
 !/CHANGELOG.md
