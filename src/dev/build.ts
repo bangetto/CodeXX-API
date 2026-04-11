@@ -40,10 +40,14 @@ async function buildContainerImages() {
         console.log(`Building container image for ${language}...`);
 
         try {
-            const dockerfile = path.join(SANDBOX_DIR, `${language}.Dockerfile`);
+            const dockerfile = `${language}.Dockerfile`;
             const buildProcess = spawn(config.containerProvider, ["build", "-t", imageName, "-f", dockerfile, SANDBOX_DIR]);
-            await handleSpawn(buildProcess);
-            console.log(`Successfully built container image for ${language}: ${imageName}`);
+            const { code, stderr } = await handleSpawn(buildProcess);
+            if (code === 0) {
+                console.log(`Successfully built container image for ${language}: ${imageName}`);
+            } else {
+                console.error(`Error building container image for ${language}:`, stderr);
+            }
         } catch (error) {
             console.error(`Error building container image for ${language}:`, error);
         }
