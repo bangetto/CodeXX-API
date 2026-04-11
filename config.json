@@ -17,6 +17,12 @@
             ],
             "executeCodeCommand": "./main.exe",
             "compilerInfoCommand": "g++ --version"
+        },
+        "py": {
+            "preWarmCount": 3,
+            "image": "codexx-py:latest",
+            "executeCodeCommand": "python3 main.py",
+            "compilerInfoCommand": "python3 --version"
         }
     },
     "containerProvider": "podman",
