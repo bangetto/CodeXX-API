@@ -21,7 +21,10 @@
         "py": {
             "preWarmCount": 3,
             "image": "codexx-py:latest",
-            "executeCodeCommand": "python3 main.py",
+            "executeCodeCommand": "python3",
+            "executionArgs": [
+                "main.py"
+            ],
             "compilerInfoCommand": "python3 --version"
         }
     },
