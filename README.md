@@ -26,8 +26,7 @@ This endpoint allows you to execute your script and fetch output results.
 
 ### What are the languages that are supported for execution?
 
-Currently only C++ and Python3 is supported out of the box. However, the system is designed to be extensible - users can easily add their own languages by setting up a Docker image and updating `config.json`.
-
+Currently only C++ and Python3 are supported out of the box. However, the system is designed to be extensible - users can easily add their own languages by setting up a Docker image and updating `config.json`.
 <details>
 <summary>Adding new languages</summary>
 

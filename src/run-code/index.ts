@@ -105,6 +105,8 @@ export async function runCode({ language, code, files, input, tests = [], mode =
         }
         await copyToContainer(containerName, tarStream);
     } catch (error) {
+        perfEnd(`job-${jobID}-TOTAL`); // PERF_LOG
+        await cleanup();
         throw error;
     }
     perfEnd(`job-${jobID}-containerSetup`); // PERF_LOG

@@ -12,9 +12,18 @@ export async function createTarStream(options: CreateTarStreamOptions): Promise<
     const entries = Object.entries(files);
     const uid = 1000;
     const gid = 1000;
+    const entryPromises: Promise<void>[] = [];
     for (const [fileName, content] of entries) {
-        pack.entry({ name: fileName, size: Buffer.byteLength(content), uid, gid }, content);
+        const entryPromise = new Promise<void>((resolve, reject) => {
+            pack.entry({ name: fileName, size: Buffer.byteLength(content), uid, gid }, content, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        entryPromises.push(entryPromise);
     }
+
+    await Promise.all(entryPromises);
 
     pack.finalize();
 
