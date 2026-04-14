@@ -2,7 +2,8 @@ import { Type, Static } from "@sinclair/typebox";
 
 // Define the schemas for request validation
 export const RunCodeBodySchema = Type.Object({
-    code: Type.String({ minLength: 1 }),
+    code: Type.Optional(Type.String({ minLength: 1 })),
+    files: Type.Optional(Type.Record(Type.String({ minLength: 1 }), Type.String({ minLength: 1 }))),
     language: Type.String({ minLength: 1 }),
     input: Type.Optional(Type.String()),
     tests: Type.Optional(Type.Array(Type.Object({

@@ -1,5 +1,6 @@
 import config from "../utils/config";
 import { spawn } from "child_process";
+import { Readable } from "stream";
 import handleSpawn from "../utils/handleSpawn";
 
 export interface ContainerStarterOptions {
@@ -21,9 +22,8 @@ function buildSecurityArgs(options: ContainerStarterOptions): string[] {
     const gid = options.gid ?? config.security?.gid ?? 1000;
 
     if (options.useSecurityFlags !== false) {
+        // Keep --cap-drop and --security-opt, but skip --read-only since we need to write to /code
         args.push(
-            '--user', `${uid}:${gid}`,
-            '--read-only',
             '--cap-drop', 'ALL',
             '--security-opt', 'no-new-privileges:true'
         );
@@ -49,6 +49,9 @@ export async function startContainer(options: ContainerStarterOptions): Promise<
 
     if (options.dirPath) {
         args.push('-v', `${options.dirPath}:/code`);
+    } else {
+        // Use container's existing /code directory (created in Dockerfile with appuser ownership)
+        // No tmpfs needed - the image already has /code with correct permissions
     }
 
     args.push('--network=none');
@@ -62,12 +65,39 @@ export async function startContainer(options: ContainerStarterOptions): Promise<
     await handleSpawn(container);
 }
 
-export async function copyToContainer(containerName: string, sourcePath: string): Promise<void> {
-    const copyProcess = spawn(config.containerProvider, ['cp', `${sourcePath}/.`, `${containerName}:/code/`]);
-    const { code, stderr } = await handleSpawn(copyProcess);
-    if (code !== 0) {
-        throw new Error(`Failed to copy code file to container: ${stderr}`);
-    }
+export async function copyToContainer(containerName: string, tarStream: Readable): Promise<void> {
+    return new Promise((resolve, reject) => {
+        // Extract as appuser - volume is owned by appuser
+        const copyProcess = spawn(config.containerProvider, ['exec', '-i', containerName, 'sh', '-c', 'rm -rf /code/* && tar -xf - -C /code/']);
+        
+        let stderr = '';
+        copyProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        tarStream.on('end', async () => {
+            copyProcess.stdin.end();
+        });
+
+        tarStream.on('error', (err) => {
+            copyProcess.kill();
+            reject(err);
+        });
+
+        copyProcess.on('close', (code) => {
+            if (code !== 0) {
+                reject(new Error(`Failed to copy code file to container: ${stderr}`));
+            } else {
+                resolve();
+            }
+        });
+
+        copyProcess.on('error', (err) => {
+            reject(err);
+        });
+
+        tarStream.pipe(copyProcess.stdin, { end: true });
+    });
 }
 
 export async function cleanupContainer(containerName: string, stopTimeout = 1): Promise<void> {

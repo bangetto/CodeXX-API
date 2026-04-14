@@ -113,7 +113,19 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
         process.exit(1);
     }
 
+    let isShuttingDown = false;
     async function gracefulShutdown(signal: string) {
+        // Guard against multiple concurrent shutdowns
+        if (isShuttingDown) {
+            console.log('Shutdown already in progress, ignoring signal');
+            return;
+        }
+        isShuttingDown = true;
+        
+        // Remove signal handlers to prevent re-triggering
+        process.removeAllListeners('SIGINT');
+        process.removeAllListeners('SIGTERM');
+        
         console.log(`\nReceived ${signal}, shutting down gracefully...`);
         const forceExitTimer = setTimeout(() => {
             console.error('Could not close connections in time, forcefully shutting down');
@@ -135,6 +147,6 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
             process.exit(1);
         }
     }
-    process.on('SIGINT', async () => await gracefulShutdown('SIGINT'));
-    process.on('SIGTERM', async () => await gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 })();

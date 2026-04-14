@@ -1,6 +1,6 @@
 import { commandMap, supportedLanguages } from "./instructions";
-import { createCodeFile } from "../file-system/createCodeFile";
-import { removeCodeFile } from "../file-system/removeCodeFile";
+import { createTarStream } from "../file-system/createTarStream";
+import { v4 as getUUID } from "uuid";
 import info from "./info";
 import { spawn } from "child_process";
 import config from "../utils/config";
@@ -11,6 +11,7 @@ import { startContainer, copyToContainer, cleanupContainer } from "./containerSt
 import { perfStart, perfEnd, flushPerfLogs } from "../utils/perfLogger";
 
 async function compileInContainer(containerName: string, compileCommand: string, compilationArgs: string[] | undefined): Promise<{ error: string | null }> {
+    // Run as appuser - volume is owned by appuser with proper security
     const compileArgs = ['exec', containerName, compileCommand, ...(compilationArgs || [])];
     const compileProcess = spawn(config.containerProvider, compileArgs);
     const { code, stderr } = await handleSpawn(compileProcess);
@@ -22,6 +23,7 @@ async function compileInContainer(containerName: string, compileCommand: string,
 
 function executeWithInputInContainer(containerName: string, executeCommand: string, executionArgs: string[] | undefined, inputStr: string|undefined, timeout: number): Promise<{ output: string; error: string }> {
     return new Promise(async (resolve, reject) => {
+        // Run as appuser - volume is owned by appuser with proper security
         const execArgs = ['exec', '-i', containerName, executeCommand, ...(executionArgs || [])];
         const executeProcess = spawn(config.containerProvider, execArgs);
         let output = '';
@@ -53,13 +55,15 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
             if (!canContinue) {
                 await new Promise(resolve => executeProcess.stdin.once('drain', resolve));
             }
+            // Ensure data is flushed to the process before closing stdin
+            await new Promise(resolve => executeProcess.stdin.once('drain', resolve));
         }
         executeProcess.stdin.end();
     });
 }
 
 
-export async function runCode({ language, code, input, tests = [], mode = "runAll" }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
+export async function runCode({ language, code, files, input, tests = [], mode = "runAll" }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
     const timeout = 30;
 
     if (!supportedLanguages.includes(language)) {
@@ -69,7 +73,17 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
         };
     }
 
-    const { jobID, dirPath } = await createCodeFile(language, code);
+    const jobID = getUUID();
+
+    const codeFiles = files || (code ? { [`main.${language}`]: code } : undefined);
+    if (!codeFiles) {
+        throw {
+            status: 400,
+            error: `Either 'code' or 'files' must be provided`
+        };
+    }
+
+    const tarStream = await createTarStream({ files: codeFiles });
 
     perfStart(`job-${jobID}-TOTAL`); // PERF_LOG
     perfStart(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
@@ -81,17 +95,16 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
     let isPooledContainer = false;
     try {
         if(!containerName) {
-            console.log(`No available container for language: ${language}. Starting a new container...`);
+            console.log(`job-${jobID}: No available container for language: ${language}. Starting a new container...`);
             containerName = `codexx-runner-${language}-${jobID}`;
-            await startContainer({ containerName, dirPath, language });
+            await startContainer({ containerName, language });
             addManagedContainer(containerName);
         } else {
-            console.log(`Reusing container for language: ${language}`)
+            console.log(`job-${jobID}: Reusing container for language: ${language}`)
             isPooledContainer = true;
-            await copyToContainer(containerName, dirPath);
         }
+        await copyToContainer(containerName, tarStream);
     } catch (error) {
-        removeCodeFile(jobID);
         throw error;
     }
     perfEnd(`job-${jobID}-containerSetup`); // PERF_LOG
@@ -108,17 +121,16 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
                         removeManagedContainer(containerName);
                     }
                 } catch (error) {
-                    console.error(`Error during cleanup for jobID: ${jobID}`, error);
+                    console.error(`job-${jobID}: Error during cleanup`, error);
                 }
             }
-            removeCodeFile(jobID);
-            console.log(`Cleaned up jobID: ${jobID}`);
             perfEnd(`job-${jobID}-cleanup`); // PERF_LOG
             perfEnd(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
-            console.log(flushPerfLogs(jobID));
         } catch(err) {
-            console.error(`Background cleanup failed for jobID ${jobID}:`, err);
-        };
+            console.error(`job-${jobID}: Background cleanup failed`, err);
+        } finally {
+            console.log(flushPerfLogs(jobID));
+        }
     };
 
     try {
@@ -127,9 +139,8 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
             const compileResult = await compileInContainer(containerName, compileCodeCommand, compilationArgs);
             perfEnd(`job-${jobID}-compile`); // PERF_LOG
             if (compileResult.error) {
-                cleanup();
+                await cleanup();
                 perfEnd(`job-${jobID}-TOTAL`); // PERF_LOG
-                console.log(flushPerfLogs(jobID));
                 // Return compilation error to the user
                 return { error: compileResult.error, language, info: info(language) };
             }
@@ -167,11 +178,11 @@ export async function runCode({ language, code, input, tests = [], mode = "runAl
 
         cleanup();
         perfEnd(`job-${jobID}-TOTAL`); // PERF_LOG
-        console.log(flushPerfLogs(jobID));
         return { output, testResults, error, language, info: info(language) };
 
     } catch (err) {
-        cleanup();
+        await cleanup();
+        perfEnd(`job-${jobID}-TOTAL`); // PERF_LOG
         throw err;
     }
 }

@@ -52,12 +52,23 @@ export function flushPerfLogs(jobID: string): string {
     if (cleanup !== undefined) parts.push(formatTiming('cleanup', cleanup, COLUMN_WIDTHS.cleanup));
     if (totalWithCleanup !== undefined) parts.push(formatTiming('total+cleanup', totalWithCleanup, COLUMN_WIDTHS.totalCleanup));
 
-    clearPerfLogs();
+    clearPerfLogs(jobID);
 
     return `job-${jobID}: ${parts.join(' | ')}`;
 }
 
-export function clearPerfLogs(): void {
-    perfTimers.clear();
-    perfDurations.clear();
+export function clearPerfLogs(jobID?: string): void {
+    if (jobID) {
+        // Clear only the specific keys for this job
+        const prefix = `job-${jobID}`;
+        for (const key of perfTimers.keys()) {
+            if (key.startsWith(prefix)) perfTimers.delete(key);
+        }
+        for (const key of perfDurations.keys()) {
+            if (key.startsWith(prefix)) perfDurations.delete(key);
+        }
+    } else {
+        perfTimers.clear();
+        perfDurations.clear();
+    }
 }
