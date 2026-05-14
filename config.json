@@ -1,33 +1,26 @@
 {
-    "version": 0.2,
-    "security": {
-        "uid": 1000,
-        "gid": 1000
+  "version": 0.2,
+  "security": {
+    "uid": 1000,
+    "gid": 1000
+  },
+  "instructions": {
+    "cpp": {
+      "preWarmCount": 3,
+      "image": "codexx-cpp:latest",
+      "compileCodeCommand": "g++",
+      "compilationArgs": ["main.cpp", "-o", "main.exe", "-O2"],
+      "executeCodeCommand": "./main.exe",
+      "compilerInfoCommand": "g++ --version"
     },
-    "instructions": {
-        "cpp": {
-            "preWarmCount": 3,
-            "image": "codexx-cpp:latest",
-            "compileCodeCommand": "g++",
-            "compilationArgs": [
-                "main.cpp",
-                "-o",
-                "main.exe",
-                "-O2"
-            ],
-            "executeCodeCommand": "./main.exe",
-            "compilerInfoCommand": "g++ --version"
-        },
-        "py": {
-            "preWarmCount": 3,
-            "image": "codexx-py:latest",
-            "executeCodeCommand": "python3",
-            "executionArgs": [
-                "main.py"
-            ],
-            "compilerInfoCommand": "python3 --version"
-        }
-    },
-    "containerProvider": "podman",
-    "containerProviderStartupCommand": "podman machine start"
+    "python": {
+      "preWarmCount": 3,
+      "image": "codexx-python:latest",
+      "executeCodeCommand": "python3",
+      "executionArgs": ["main.py"],
+      "compilerInfoCommand": "python3 --version"
+    }
+  },
+  "containerProvider": "podman",
+  "containerProviderStartupCommand": "podman machine start"
 }
