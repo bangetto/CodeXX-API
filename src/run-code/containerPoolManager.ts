@@ -1,11 +1,12 @@
 import config from "../utils/config";
+import { getDefaultLimits } from "../utils/config";
 import { spawn } from "child_process";
 import handleSpawn from "../utils/handleSpawn";
 import { startContainer } from "./containerStarter";
 import { Mutex } from "async-mutex";
 
-async function startPoolContainer(containerName: string, language: string): Promise<void> {
-    await startContainer({ containerName, language });
+async function startPoolContainer(containerName: string, language: string, memory?: number, pids?: number): Promise<void> {
+    await startContainer({ containerName, language, memory, pids });
 }
 
 let containerPool: { [language: string]: string[] } = {};
@@ -39,8 +40,9 @@ export async function initializeContainerPool() {
             for (let i = 0; i < instr.preWarmCount; i++) {
                 const startPromise = new Promise<void>(async (resolve) => {
                     const containerName = `codexx-prewarm-${language}-${i}`;
+                    const defaults = getDefaultLimits();
                     try {
-                        await startPoolContainer(containerName, language);
+                        await startPoolContainer(containerName, language, defaults.memory, defaults.pids);
                         containerPool[language].push(containerName);
                         managedContainers.add(containerName);
                     } catch (err) {
@@ -125,7 +127,7 @@ export async function cleanupContainerPool(): Promise<void> {
         });
         cleanupPromises.push(promise);
     }
-    
+
     console.log(`Initiating removal of ${cleanupPromises.length} containers...`);
     await Promise.all(cleanupPromises);
     containerPool = {};

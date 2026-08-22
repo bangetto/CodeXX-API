@@ -1,9 +1,5 @@
 {
   "version": 0.2,
-  "security": {
-    "uid": 1000,
-    "gid": 1000
-  },
   "instructions": {
     "cpp": {
       "preWarmCount": 3,
@@ -19,6 +15,16 @@
       "executeCodeCommand": "python3",
       "executionArgs": ["main.py"],
       "compilerInfoCommand": "python3 --version"
+    }
+  },
+  "containerLimits": {
+    "default": {
+      "memory": 256,
+      "pids": 64
+    },
+    "max": {
+      "memory": 1024,
+      "pids": 256
     }
   },
   "containerProvider": "podman",

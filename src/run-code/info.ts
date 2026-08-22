@@ -1,7 +1,7 @@
 import { commandMap } from "./instructions";
 import { exec as execCB } from "child_process";
 import { getContainer, returnContainer } from "./containerPoolManager";
-import config from "../utils/config";
+import config, { getDefaultLimits } from "../utils/config";
 import util from "util";
 
 const exec = util.promisify(execCB);
@@ -9,9 +9,12 @@ let info: { [language: string]: string } = {};
 
 async function getCompilerInfoFromNewContainer(language: string): Promise<string> {
     const containerName = `codexx-info-${language}`;
+    const defaults = getDefaultLimits();
     const args = [
         'run', '-a', 'stdout', '-a', 'stderr',
         '--name', containerName,
+        '--memory', `${defaults.memory}m`,
+        '--pids-limit', defaults.pids.toString(),
         '--network=none', '-q',
         '--rm', `${language}-compile-run`,
         commandMap('', language).compilerInfoCommand

@@ -1,4 +1,4 @@
-import config from "../utils/config";
+import config, { getDefaultLimits } from "../utils/config";
 import { spawn } from "child_process";
 import { Readable } from "stream";
 import handleSpawn from "../utils/handleSpawn";
@@ -10,23 +10,36 @@ export interface ContainerStarterOptions {
     dirPath?: string;
     useBaseImage?: boolean;
     useSecurityFlags?: boolean;
-    uid?: number;
-    gid?: number;
+    memory?: number;
+    pids?: number;
 }
 
 const BASE_IMAGE = "codexx-base:latest";
 
 function buildSecurityArgs(options: ContainerStarterOptions): string[] {
     const args: string[] = [];
-    const uid = options.uid ?? config.security?.uid ?? 1000;
-    const gid = options.gid ?? config.security?.gid ?? 1000;
 
     if (options.useSecurityFlags !== false) {
-        // Keep --cap-drop and --security-opt, but skip --read-only since we need to write to /code
+        // skip --read-only since we need to write to /code
         args.push(
             '--cap-drop', 'ALL',
             '--security-opt', 'no-new-privileges:true'
         );
+    }
+    return args;
+}
+
+function buildResourceLimitArgs(options: ContainerStarterOptions): string[] {
+    const args: string[] = [];
+    const defaults = getDefaultLimits();
+    const memory = options.memory ?? defaults.memory;
+    const pids = options.pids ?? defaults.pids;
+
+    if (memory > 0) {
+        args.push('--memory', `${memory}m`);
+    }
+    if (pids > 0) {
+        args.push('--pids-limit', pids.toString());
     }
     return args;
 }
@@ -39,13 +52,14 @@ function buildImageArg(options: ContainerStarterOptions): string {
     if (langImage) {
         return langImage;
     }
-    return options.language || "alpine";
+    return options.language || BASE_IMAGE;
 }
 
 export async function startContainer(options: ContainerStarterOptions): Promise<void> {
     const args = ['run', '-d', '--name', options.containerName];
 
     args.push(...buildSecurityArgs(options));
+    args.push(...buildResourceLimitArgs(options));
 
     if (options.dirPath) {
         args.push('-v', `${options.dirPath}:/code`);
@@ -69,7 +83,7 @@ export async function copyToContainer(containerName: string, tarStream: Readable
     return new Promise((resolve, reject) => {
         // Extract as appuser - volume is owned by appuser
         const copyProcess = spawn(config.containerProvider, ['exec', '-i', containerName, 'sh', '-c', 'rm -rf /code/* && tar -xf - -C /code/']);
-        
+
         let stderr = '';
         copyProcess.stderr.on('data', (data) => {
             stderr += data.toString();

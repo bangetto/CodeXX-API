@@ -3,7 +3,7 @@ import { createTarStream } from "../file-system/createTarStream";
 import { v4 as getUUID } from "uuid";
 import info from "./info";
 import { spawn } from "child_process";
-import config from "../utils/config";
+import config, { getDefaultLimits, resolveLimits } from "../utils/config";
 import { getContainer, returnContainer, addManagedContainer, removeManagedContainer } from "./containerPoolManager";
 import handleSpawn from "../utils/handleSpawn";
 import { RunCodeError, RunCodeRequest, SuccessResponse } from "../utils/schemas";
@@ -63,7 +63,7 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
 }
 
 
-export async function runCode({ language, code, files, input, tests = [], mode = "runAll" }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
+export async function runCode({ language, code, files, input, tests = [], mode = "runAll", memory, pids }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
     const timeout = 30;
 
     if (!supportedLanguages.includes(language)) {
@@ -74,6 +74,9 @@ export async function runCode({ language, code, files, input, tests = [], mode =
     }
 
     const jobID = getUUID();
+    const limits = resolveLimits({ memory, pids });
+    const defaults = getDefaultLimits();
+    const hasCustomLimits = limits.memory !== defaults.memory || limits.pids !== defaults.pids;
 
     const codeFiles = files || (code ? { [`main.${language}`]: code } : undefined);
     if (!codeFiles) {
@@ -89,15 +92,19 @@ export async function runCode({ language, code, files, input, tests = [], mode =
     perfStart(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
 
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
-    let containerName = await getContainer(language);
-    
+    let containerName = hasCustomLimits ? null : await getContainer(language);
+
     perfStart(`job-${jobID}-containerSetup`); // PERF_LOG
     let isPooledContainer = false;
     try {
         if(!containerName) {
-            console.log(`job-${jobID}: No available container for language: ${language}. Starting a new container...`);
+            if (hasCustomLimits) {
+                console.log(`job-${jobID}: Custom limits requested, bypassing pool. Starting new container...`);
+            } else {
+                console.log(`job-${jobID}: No available container for language: ${language}. Starting a new container...`);
+            }
             containerName = `codexx-runner-${language}-${jobID}`;
-            await startContainer({ containerName, language });
+            await startContainer({ containerName, language, memory: limits.memory, pids: limits.pids });
             addManagedContainer(containerName);
         } else {
             console.log(`job-${jobID}: Reusing container for language: ${language}`)

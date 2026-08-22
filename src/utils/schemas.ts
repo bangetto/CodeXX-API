@@ -13,7 +13,9 @@ export const RunCodeBodySchema = Type.Object({
     mode: Type.Optional(Type.Union([
         Type.Literal('runAll'),
         Type.Literal('failFast')
-    ]))
+    ])),
+    memory: Type.Optional(Type.Number({ minimum: 1 })),
+    pids: Type.Optional(Type.Number({ minimum: 1 }))
 });
 
 const BaseResponseSchema = Type.Object({
