@@ -21,10 +21,6 @@
     "default": {
       "memory": 256,
       "pids": 64
-    },
-    "max": {
-      "memory": 1024,
-      "pids": 256
     }
   },
   "containerProvider": "podman",

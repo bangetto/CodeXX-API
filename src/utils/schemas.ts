@@ -14,8 +14,7 @@ export const RunCodeBodySchema = Type.Object({
         Type.Literal('runAll'),
         Type.Literal('failFast')
     ])),
-    memory: Type.Optional(Type.Number({ minimum: 1 })),
-    pids: Type.Optional(Type.Number({ minimum: 1 }))
+pids: Type.Optional(Type.Number({ minimum: 1 }))
 });
 
 const BaseResponseSchema = Type.Object({

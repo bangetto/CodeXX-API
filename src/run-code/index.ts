@@ -63,7 +63,7 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
 }
 
 
-export async function runCode({ language, code, files, input, tests = [], mode = "runAll", memory, pids }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
+export async function runCode({ language, code, files, input, tests = [], mode = "runAll" }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
     const timeout = 30;
 
     if (!supportedLanguages.includes(language)) {
@@ -74,9 +74,7 @@ export async function runCode({ language, code, files, input, tests = [], mode =
     }
 
     const jobID = getUUID();
-    const limits = resolveLimits({ memory, pids });
-    const defaults = getDefaultLimits();
-    const hasCustomLimits = limits.memory !== defaults.memory || limits.pids !== defaults.pids;
+    const limits = resolveLimits();
 
     const codeFiles = files || (code ? { [`main.${language}`]: code } : undefined);
     if (!codeFiles) {
@@ -92,17 +90,13 @@ export async function runCode({ language, code, files, input, tests = [], mode =
     perfStart(`job-${jobID}-TOTAL-with-cleanup`); // PERF_LOG
 
     const { compileCodeCommand, compilationArgs, executeCodeCommand, executionArgs } = commandMap(jobID, language);
-    let containerName = hasCustomLimits ? null : await getContainer(language);
+    let containerName = await getContainer(language);
 
     perfStart(`job-${jobID}-containerSetup`); // PERF_LOG
     let isPooledContainer = false;
     try {
         if(!containerName) {
-            if (hasCustomLimits) {
-                console.log(`job-${jobID}: Custom limits requested, bypassing pool. Starting new container...`);
-            } else {
-                console.log(`job-${jobID}: No available container for language: ${language}. Starting a new container...`);
-            }
+            console.log(`job-${jobID}: No available container for language: ${language}. Starting a new container...`);
             containerName = `codexx-runner-${language}-${jobID}`;
             await startContainer({ containerName, language, memory: limits.memory, pids: limits.pids });
             addManagedContainer(containerName);

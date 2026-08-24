@@ -17,7 +17,6 @@ export interface ResourceLimit {
 
 export interface ContainerLimits {
   default: ResourceLimit;
-  max: ResourceLimit;
 }
 
 export interface Config {
@@ -40,20 +39,8 @@ export function getDefaultLimits(): ResourceLimit {
     };
 }
 
-export function resolveLimits(requested?: Partial<ResourceLimit>): ResourceLimit {
-  const defaults = getDefaultLimits();
-  const max = config.containerLimits?.max ?? defaults;
-  const mem = requested?.memory && requested.memory > 0 ? requested.memory : defaults.memory;
-  const pids = requested?.pids && requested.pids > 0 ? requested.pids : defaults.pids;
-
-  const memory = Math.min(mem, max.memory);
-  const pidsResolved = Math.min(pids, max.pids);
-
-  if (mem > max.memory || pids > max.pids) {
-    console.warn(`Requested resource limits exceed configured max and were clamped (requested: memory=${mem}, pids=${pids}; max: memory=${max.memory}, pids=${max.pids})`);
-  }
-
-  return { memory, pids: pidsResolved };
+export function resolveLimits(): ResourceLimit {
+  return getDefaultLimits();
 }
 
 export default config;
