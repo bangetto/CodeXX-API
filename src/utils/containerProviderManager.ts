@@ -3,6 +3,11 @@ import { spawn } from "child_process";
 
 const readinessTimeout = 5000; // 5 seconds
 
+/**
+ * Checks the readiness of the container provider by spawning a `info` command and waiting for it to complete.
+ *
+ * @returns A promise that resolves to `true` if the container provider is ready, `false` otherwise.
+ */
 async function checkContainerProviderReadiness(): Promise<boolean> {
     return new Promise((resolve) => {
         let settled = false;
@@ -49,6 +54,11 @@ async function checkContainerProviderReadiness(): Promise<boolean> {
     });
 }
 
+/**
+ * Attempts to start the container provider by executing the startup command from the config.
+ *
+ * @returns A promise that resolves to `true` if the container provider was successfully started, `false` otherwise.
+ */
 async function attemptToStartContainerProvider(): Promise<boolean> {
     if (!config.containerProviderStartupCommand) {
         return false;

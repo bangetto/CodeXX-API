@@ -8,6 +8,11 @@ export interface CommandMapResult {
     compilerInfoCommand: string;
 }
 
+/**
+ * @param jobID
+ * @param language
+ * @returns The compilation and execution commands and arguments for the given language.
+ */
 export function commandMap(jobID: string, language: string): CommandMapResult {
     const instr = config.instructions[language];
     if (!instr) throw new Error(`Unsupported language: ${language}`);

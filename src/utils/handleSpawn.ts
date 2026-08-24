@@ -5,6 +5,11 @@ export interface SpawnResult {
     stderr: string;
 }
 
+/**
+ * Handles the spawn of a child process, capturing its output and error.
+ * @param childProcess The child process to handle.
+ * @returns A promise that resolves to the spawn result.
+ */
 export default function handleSpawn(
     childProcess: ChildProcess,
 ): Promise<SpawnResult> {

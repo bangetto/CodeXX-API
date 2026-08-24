@@ -1,14 +1,12 @@
 import config, { getDefaultLimits } from "../utils/config";
 import { spawn } from "child_process";
-import { Readable } from "stream";
+import { Readable as ReadableStream } from "stream";
 import handleSpawn from "../utils/handleSpawn";
 
 export interface ContainerStarterOptions {
     containerName: string;
     image?: string;
     language?: string;
-    dirPath?: string;
-    useBaseImage?: boolean;
     useSecurityFlags?: boolean;
     memory?: number;
     pids?: number;
@@ -21,9 +19,10 @@ function buildSecurityArgs(options: ContainerStarterOptions): string[] {
 
     if (options.useSecurityFlags !== false) {
         // skip --read-only since we need to write to /code
-        args.push(
-            '--cap-drop', 'ALL',
-            '--security-opt', 'no-new-privileges:true'
+      args.push(
+          '--network', 'none',
+          '--cap-drop', 'ALL',
+          '--security-opt', 'no-new-privileges:true'
         );
     }
     return args;
@@ -45,41 +44,31 @@ function buildResourceLimitArgs(options: ContainerStarterOptions): string[] {
 }
 
 function buildImageArg(options: ContainerStarterOptions): string {
-    if (options.useBaseImage && options.image) {
-        return options.image;
-    }
-    const langImage = options.language ? config.instructions[options.language]?.image : undefined;
-    if (langImage) {
-        return langImage;
-    }
-    return options.language || BASE_IMAGE;
+  if (options.image) return options.image;
+
+  const langImage = options.language ? config.instructions[options.language]?.image : undefined;
+  if (langImage) return langImage;
+
+  return options.language || BASE_IMAGE;
 }
 
 export async function startContainer(options: ContainerStarterOptions): Promise<void> {
-    const args = ['run', '-d', '--name', options.containerName];
+  const args = ['run', '-d', '--name', options.containerName];
 
-    args.push(...buildSecurityArgs(options));
-    args.push(...buildResourceLimitArgs(options));
+  args.push(...buildSecurityArgs(options));
+  args.push(...buildResourceLimitArgs(options));
 
-    if (options.dirPath) {
-        args.push('-v', `${options.dirPath}:/code`);
-    } else {
-        // Use container's existing /code directory (created in Dockerfile with appuser ownership)
-        // No tmpfs needed - the image already has /code with correct permissions
-    }
+  const image = buildImageArg(options);
+  args.push(image);
 
-    args.push('--network=none');
+  // Keep container running for multiple commands
+  args.push('sleep', 'infinity');
 
-    const image = buildImageArg(options);
-
-    args.push(image);
-    args.push('sleep', 'infinity');
-
-    const container = spawn(config.containerProvider, args);
-    await handleSpawn(container);
+  const container = spawn(config.containerProvider, args);
+  await handleSpawn(container);
 }
 
-export async function copyToContainer(containerName: string, tarStream: Readable): Promise<void> {
+export async function copyToContainer(containerName: string, tarStream: ReadableStream): Promise<void> {
     return new Promise((resolve, reject) => {
         // Extract as appuser - volume is owned by appuser
         const copyProcess = spawn(config.containerProvider, ['exec', '-i', containerName, 'sh', '-c', 'rm -rf /code/* && tar -xf - -C /code/']);
@@ -93,7 +82,7 @@ export async function copyToContainer(containerName: string, tarStream: Readable
             copyProcess.stdin.end();
         });
 
-        tarStream.on('error', (err) => {
+        tarStream.on('error', (err: any) => {
             copyProcess.kill();
             reject(err);
         });

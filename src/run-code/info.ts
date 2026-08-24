@@ -26,6 +26,9 @@ async function getCompilerInfoFromNewContainer(language: string): Promise<string
     return res.stdout.trim();
 }
 
+/**
+ * Helper function to get the compiler info for a given language.
+ */
 async function getLanguageInfo(language: string): Promise<[string, string]> {
     const container = await getContainer(language);
     try {
@@ -48,14 +51,17 @@ async function getLanguageInfo(language: string): Promise<[string, string]> {
     }
 }
 
+/**
+ * Initializes the language info into memory by fetching compiler information for each supported language.
+ */
 export async function initInfo() {
     console.log("Initializing language info...");
     const languages = Object.keys(config.instructions);
-    
+
     const promises = languages.map(language => getLanguageInfo(language));
 
     const results = await Promise.allSettled(promises);
-    
+
     const errors: string[] = [];
     results.forEach((result, index) => {
         if (result.status === 'fulfilled') {

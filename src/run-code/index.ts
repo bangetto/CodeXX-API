@@ -62,7 +62,11 @@ function executeWithInputInContainer(containerName: string, executeCommand: stri
     });
 }
 
-
+/**
+ * The main function to run the code in the specified language.
+ * @param {RunCodeRequest} options The incoming HTTP request body.
+ * @returns {Promise<SuccessResponse | RunCodeError>} A promise that resolves to the success response or an error.
+ */
 export async function runCode({ language, code, files, input, tests = [], mode = "runAll" }: RunCodeRequest): Promise<SuccessResponse | RunCodeError> {
     const timeout = 30;
 

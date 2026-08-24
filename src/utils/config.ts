@@ -39,6 +39,12 @@ export function getDefaultLimits(): ResourceLimit {
     };
 }
 
+/** Resolves the resource limits for the container.
+*
+* *Currently, the default limits are returned. This function is kept for future per-request limits.*
+ *
+ * @returns The resolved resource limits.
+ */
 export function resolveLimits(): ResourceLimit {
   return getDefaultLimits();
 }

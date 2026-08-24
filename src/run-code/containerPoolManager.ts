@@ -9,8 +9,12 @@ async function startPoolContainer(containerName: string, language: string, memor
     await startContainer({ containerName, language, memory, pids });
 }
 
+/** The pool of prewarm containers grouped by language */
 let containerPool: { [language: string]: string[] } = {};
+
+/** All containers managed by the program (including those outside the pool) */
 let managedContainers: Set<string> = new Set();
+
 const languageLocks: Map<string, Mutex> = new Map();
 
 function getLanguageLock(language: string): Mutex {
@@ -58,6 +62,12 @@ export async function initializeContainerPool() {
     console.log("Container pool initialized.");
 }
 
+/**
+ * Retrieves a container from the pool for the specified language.
+ *
+ * @param language The language for which to retrieve a container.
+ * @returns A promise that resolves to the container name if available, `null` otherwise.
+ */
 export async function getContainer(language: string): Promise<string | null> {
     const lock = getLanguageLock(language);
     return lock.runExclusive(() => {
@@ -69,6 +79,14 @@ export async function getContainer(language: string): Promise<string | null> {
     });
 }
 
+/**
+ * Returns a container to the pool for the specified language.
+ *
+ * *Also handles full cleanup of the container. Including file system cleanup and container restart.*
+ *
+ * @param language The language for which to return the container.
+ * @param containerName The name of the container to return.
+ */
 export async function returnContainer(language: string, containerName: string): Promise<void> {
     if (!containerPool[language]) {
         containerPool[language] = [];
@@ -90,6 +108,9 @@ export async function returnContainer(language: string, containerName: string): 
 }
 
 let cleaningUp = false;
+/**
+ * Cleans up all managed containers. Used for proper shutdown and cleanup of container resources.
+ */
 export async function cleanupContainerPool(): Promise<void> {
     if (cleaningUp) {
         return;
