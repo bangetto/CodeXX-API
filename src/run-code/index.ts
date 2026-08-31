@@ -183,7 +183,10 @@ export async function runCode({ language, code, files, input, tests = [], mode =
         }
         perfEnd(`job-${jobID}-execute`); // PERF_LOG
 
+        // Fire cleanup in the background
+        // so it doesn't block the response
         cleanup();
+
         perfEnd(`job-${jobID}-TOTAL`); // PERF_LOG
         return { output, testResults, error, language, info: info(language) };
 

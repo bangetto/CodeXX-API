@@ -121,18 +121,21 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
             return;
         }
         isShuttingDown = true;
-        
+
         // Remove signal handlers to prevent re-triggering
         process.removeAllListeners('SIGINT');
         process.removeAllListeners('SIGTERM');
-        
+
         console.log(`\nReceived ${signal}, shutting down gracefully...`);
         const forceExitTimer = setTimeout(() => {
             console.error('Could not close connections in time, forcefully shutting down');
-            cleanupContainerPool().catch(err => {
+            cleanupContainerPool().then(() => {
+                console.error('Forced container pool cleanup finished.');
+                process.exit(1);
+            }).catch(err => {
                 console.error('Error during forced container pool cleanup:', err);
+                process.exit(1);
             });
-            process.exit(1);
         }, 30000);
         try {
             await app.close();
@@ -144,6 +147,9 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
         } catch (err) {
             console.error('Error during graceful shutdown:', err);
             clearTimeout(forceExitTimer);
+            await cleanupContainerPool().catch(err => {
+                console.error('Error during forced container pool cleanup:', err);
+            });
             process.exit(1);
         }
     }

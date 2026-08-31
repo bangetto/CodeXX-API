@@ -109,6 +109,9 @@ export async function cleanupContainer(containerName: string, stopTimeout = 1): 
 }
 
 async function executeCommand(cmd: string, args: string[]): Promise<void> {
-    const process = spawn(cmd, args);
-    await handleSpawn(process);
+    const proc = spawn(cmd, args);
+    const { code, stderr } = await handleSpawn(proc);
+    if (code !== 0) {
+        throw new Error(`Command '${cmd} ${args.join(' ')}' exited with code ${code}: ${stderr}`);
+    }
 }
